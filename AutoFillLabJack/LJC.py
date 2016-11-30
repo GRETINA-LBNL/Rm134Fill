@@ -6,6 +6,7 @@ Created on Sep 15, 2016
 from labjack import ljm
 from labjack.ljm.ljm import LJMError
 from time import sleep
+# from multiprocessing.managers import State
 # from ConfigParser import RawConfigParser
 
 class LJC(object):
@@ -102,11 +103,12 @@ class LJC(object):
         for (name,configuration) in zip(names,configurations):
             index = self.extendedFeaturesIndex[configuration]
             EF_name = name+'_EF_INDEX'
+            CONFIG_A_Name = name+'_EF_CONFIG_A'
             CONFIG_B_Name = name+'_EF_CONFIG_B'
             CONFIG_D_Name = name+'_EF_CONFIG_D'
             CONFIG_E_Name = name+'_EF_CONFIG_E'
-            setting_names = [EF_name,CONFIG_B_Name,CONFIG_D_Name,CONFIG_E_Name]
-            setting_values = [index,0,55.56,255.37]
+            setting_names = [EF_name,CONFIG_A_Name,CONFIG_B_Name,CONFIG_D_Name,CONFIG_E_Name]
+            setting_values = [index,    2,              0,           55.56,        255.37]
             ljm.eWriteNames(self.controller, 4, setting_names, setting_values)
 #             ljm.eWriteName(self.controller, name, index)
             
@@ -128,7 +130,7 @@ class LJC(object):
             ljm.eWriteNames(self.controller, 5, setting_names, setting_values)
             
             
-    def readValveTemps(self,detectorList):
+    def readVentTemps(self,detectorList):
         '''
         Read the valve temperatures from the list
         :detectorList: - list of string detector names whose temperatures will be read from the labjack
@@ -138,7 +140,8 @@ class LJC(object):
             names.append(self.valveTempDict[detector]) #build the list of port names for the requested temperature
         names_readA = map(lambda x: x+'_EF_READ_A', names) #adjust the name to read with the EF options
         stringTemps = self._LJReadValues(names_readA) #return the values
-        return map(lambda x: float(x),stringTemps) #conver to list of floats
+        return stringTemps
+#         return map(lambda x: float(x),stringTemps) #conver to list of floats
         
     def readDetectorTemps(self,detectorList):
         '''
@@ -200,18 +203,18 @@ class LJC(object):
         '''
         Read the inhibit input 
         '''
-        self._LJReadValues(names)
+        return self._LJReadSingleState(self.inhibitInput)
         
     def heartbeatFlash(self):
         '''
         Flash the hearbeat light
         '''
         self.writeHeartbeatState(True)
-        sleep(.1)
+        sleep(.03)
         self.writeHeartbeatState(False)
-        sleep(.1)
+        sleep(.03)
         self.writeHeartbeatState(True)
-        sleep(.1)
+        sleep(.03)
         self.writeHeartbeatState(False)
       
         
@@ -234,7 +237,18 @@ class LJC(object):
             value = 0
         self._LJWriteValues([name], [value])
                              
-                             
+    def _LJReadSingleState(self,name):
+        '''
+        Read a single value from a digital input, convert it to bool
+        :name: - string name of input to read
+        '''           
+        value = self._LJReadValue(name)
+        if value == 0:
+            state = False
+        elif value == 1:
+            state = True
+        return state
+    
     def _LJWriteValues(self,names,values):
         '''
         :names: - list of LJ channels names to write to
@@ -263,6 +277,7 @@ class LJC(object):
 #             return None
 #         else:
         return values
+    
     def _LJReadValue(self,name):
         value = ljm.eReadName(self.controller,name)
         return value

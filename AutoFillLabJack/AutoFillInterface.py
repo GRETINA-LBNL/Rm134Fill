@@ -8,6 +8,8 @@ from AutoFillLabJack.LJC import LJC
 import ConfigParser
 from datetime import datetime as dt
 from datetime import timedelta as td
+from email.mime.text import MIMEText
+import smtplib
 
 class AutoFillInterface():
     '''
@@ -23,13 +25,15 @@ class AutoFillInterface():
         self.errorList = [] #storage of error string recored for each LJ poll
         self.detectorConfigDict = {} #locations for setting for the detector
         self.detectorValuesDict = {} #storage for the detectors current settings
-        self.detectorConfigFile = 'C:\Python\Misc\AutoFillLabJack\DetectorConfiguration.cfg'
-        self.detectorSettings = ['Name','Fill Enabled','Fill Schedule','Fill Timout','Minimum Fill Time','Detector Max Temperature'] #Settings for each
+        self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
+        self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
+        self.detectorSettings = ['Name','Fill Enabled','Fill Schedule','Fill Timeout','Minimum Fill Time','Detector Max Temperature'] #Settings for each
         self.loadConfigEvent = threading.Event()
         self.timeFormat = '%H:%M'
-        self.LNTemp = 77 #Temperature in kelvin
+        self.LNTemp = 83.0 #Temperature in kelvin
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
+        self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
        
@@ -38,37 +42,47 @@ class AutoFillInterface():
         initilize the lab jack
         '''
         try:
-            self.LJ = LJC()
+            cnfgFile = ConfigParser.RawConfigParser()
+            cnfgFile.read('C:\Python\Misc\AutoFillLabJack\PortWiring.cfg')
+            self.LJ = LJC(cnfgFile)
             self.LJ.controllerInit()
         except:
-            print 'Lab Jack failed to Initilize'
-            return False
+            print 'e'
+            raise 
+        self.loadDetectorConfig()
     
     def initRelease(self):
         '''
         Clean enerything up before closing
         turn off all the leds and valves
         '''  
-        states = [False] * self.detectors
-        self.LJ.writeDetectorStates(self.detectors,states)
-        self.LJ.writeEnableLEDState(self.detectors, states)
+        states = [False] * len(self.detectors)
+        self.writeValveState(self.detectors,states)
+        self.writeEnableLEDState(self.detectors, states)
+        self.writeEnableLEDState(['Line Chill'], [False])
+        self.writeValveState(['Line Chill'], [False])
         self.LJ.writeErrorState(False)
         self.LJ.writeInhibitState(False)
         self.LJ.releaseInit()
+        del self.LJ
         
-    def readDetectorTemps(self,detectors):
+    def readDetectorTemps(self):
         '''
         :detectors: list of detector names(string) to read temperature
         '''
-        temperatures = self.LJ.readDetectorTemps(detectors)
-        return temperatures
+        temperatures = self.LJ.readDetectorTemps(self.detectors)
+        for (temp,detector) in zip(temperatures,self.detectors):
+            self.detectorValuesDict[detector]['Detector Temperature'] = temp
+        
     
-    def readValveTemps(self,detectors):
+    def readVentTemps(self):
         '''
         :detectors: list of detector names (strings) to read the valve temperature
         '''
-        temperatures = self.LJ.readValveTemps(detectors)
-        return temperatures
+        temperatures = self.LJ.readVentTemps(self.enabledDetectors)
+        for (temp,detector) in zip(temperatures,self.enabledDetectors):
+            self.detectorValuesDict[detector]['Vent Temperature'] = temp
+        
     
     def writeValveState(self,detectors,states):
         '''
@@ -76,7 +90,7 @@ class AutoFillInterface():
         :detectors: list of detector names to set valve state, list of string names
         :valveState: list of states to set the valves to, list of bools
         '''
-        self.LJ.writeValveState(detectors, states)
+        self.LJ.writeValveStates(detectors, states)
         
     def writeEnableLEDState(self,detectors,states):
         '''
@@ -84,7 +98,7 @@ class AutoFillInterface():
         :states: list of states for the detectors, list of bools
         '''
         self.LJ.writeEnableLEDState(detectors, states)
-        
+    
     def loadDetectorConfig(self):
         '''
         Load the data from the configuration file for each detector
@@ -99,30 +113,41 @@ class AutoFillInterface():
             self.detectorConfigDict[detector] = config
         self.enabledDetectors = []
         self.detectors = []
+        self.lineChillEnabled = False
+        self.lineChillTimeout = 0
         for detector in self.detectorConfigDict.keys():
             if 'Detector' in detector: #make sure it is a detector not the line chill
                 self.detectors.append(detector)
-                self.detectorValuesDict[detector] = {'Detector Temp':0.0,'Valve Temp':0.0,'Valve State':False,'Fill Started Time':0.0}
+                self.detectorValuesDict[detector] = {'Detector Temperature':'0:0','Vent Temperature':'0:0','Valve State':False,\
+                                                     'Fill Started Time':'0:0'}
                 if self.detectorConfigDict[detector]['Fill Enabled'] == 'True':
                     self.enabledDetectors.append(detector)
+        self.lineChillEnabled = bool(cnfgFile.get('Line Chill','Enabled'))
+        self.lineChillTimeout = float(cnfgFile.get('Line Chill','Chill Timeout'))
+        offStates = [False]*len(self.detectors)
+        self.writeEnableLEDState(self.detectors, offStates)
+        states = [True]*len(self.enabledDetectors)
+        self.writeEnableLEDState(self.enabledDetectors, states)
+        self.writeEnableLEDState(['Line Chill'], [self.lineChillEnabled])
+        
         
     def runThread(self):
         '''
         Thread run the detector filling
         '''
         # read all the detector temps temperatures
-        detTemps = self.LJ.readDetectorTemps(self.detectors)
-        for (temp,detector) in zip(detTemps,self.detectors):
-            self.detectorValuesDict[detector]['Detector Temperature'] = temp
+        self.readDetectorTemps()
         # if the check configuration event is set read the configuration list to get a list of enabled detectors and other
         if self.loadConfigEvent.is_set():
             self.loadDetectorConfig()
+            
         # check temperatures for any enabled detectors that are above maximun temperature, set error LED and send email is nessassary
         self.checkDetectorTemperatures()
         # check enabled detector's settings and start fills if needed
+        self.checkFillInhibit()
         self.checkStartDetectorFills()
         
-        if self.inihibitFills != True: #if the inhibit fills is true no new fills will be started so don't do anyother checking
+        if self.inihibitFills == False: #if the inhibit fills is true no new fills will be started so don't do anyother checking
             # check currently filling detectors for min fill time breach
             self.checkMinFillTime()
             # for filling detectrors check for vent temp reaching LN levels
@@ -130,15 +155,16 @@ class AutoFillInterface():
             # check for filling timeout, set error and close valve if nessassary 
             self.checkFillTimeout()
             #check for errors with filling or detector temperature
-        self.checkDetectorErrors() 
+        errorBody = self.checkDetectorErrors()
+        if errorBody != '':
+            print errorBody
+#             self.sendEmail(errorBody)
+        
         # repeat
         # flash the heatbeat light
         self.LJ.heartbeatFlash()
-        
-        
-        
-
-        
+        return True
+         
     
     def checkDetectorTemperatures(self):
         '''
@@ -146,12 +172,11 @@ class AutoFillInterface():
         
         '''  
         for detector in self.enabledDetectors:
-            maxTemp = float(self.detectorConfigDict[detector]['Detector Maximum Temperature'])
+            maxTemp = float(self.detectorConfigDict[detector]['Detector Max Temperature'])
             curTemp = float(self.detectorValuesDict[detector]['Detector Temperature'])
             if curTemp > maxTemp:
                 name = self.detectorConfigDict[detector]['Name']
-                msg = '% detector temperature has exceeded its max allowed temperature'(name)
-                
+                msg = '%s detector temperature has exceeded its max allowed temperature'%(name)
                 self.errorList.append(msg)
                
         
@@ -164,16 +189,21 @@ class AutoFillInterface():
         curTimeStr = curTime.strftime(self.timeFormat) #get the current time as a sting with format Hour:Min
         for detector in self.enabledDetectors:
             schedule = self.detectorConfigDict[detector]['Fill Schedule']
-            if curTime in schedule:
+            if curTimeStr in schedule:
                 if self.detectorValuesDict[detector]['Valve State'] == False: #check to make sure the valve has not already been opened
                     detectorToOpen.append(detector)
+                    print 'Opening valve for detector', detector
                     self.detectorValuesDict[detector]['Fill Start'] = curTimeStr
-                    minFillDelta = td(self.detectorConfigDict[detector]['Minimum Fill Time'],'%M')
-                    maxFillDelta = td(self.detectorConfigDict[detector]['Fill Timeout'],'%M')
-                    self.detectorValuesDict[detector]['Min Fill Timeout'] = dt.strftime(curTime+minFillDelta,self.timeFormat)
+#                     minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
+#                     maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
+                    
+                    minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
+                    maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
+                    self.detectorValuesDict[detector]['Minimum Fill Timeout'] = dt.strftime(curTime+minFillDelta,self.timeFormat)
                     #min time the valve can be opened before 
-                    self.detectorValuesDict[detector]['Min Fill Expired'] = False
-                    self.detectorValuesDict[detector]['Max Fill Timeout'] = dt.strftime(curTime+maxFillDelta,self.timeFormat)
+                    self.detectorValuesDict[detector]['Minimum Fill Expired'] = False
+                    self.detectorValuesDict[detector]['Maximum Fill Timeout'] = dt.strftime(curTime+maxFillDelta,self.timeFormat)
+                    
                     #max fill time
                     
         numValves = len(detectorToOpen)
@@ -184,7 +214,9 @@ class AutoFillInterface():
         else:
             if numValves != 0:
                 states = [True] *numValves
-                self.LJ.writeHeartbeatStates(detectorToOpen,states)
+                self.writeValveState(detectorToOpen,states)
+                for detector in detectorToOpen:
+                    self.detectorValuesDict[detector]['Valve State'] = True
         
     def checkMinFillTime(self):
         '''
@@ -192,10 +224,12 @@ class AutoFillInterface():
         '''
         curTime = dt.today().strftime(self.timeFormat)
         for detector in self.enabledDetectors:
-            if self.detectorValuesDict[detector]['Valve State'] == True:
-                minTimeout = self.detectorValuesDict[detector]['Min Fill Timout']
-                if minTimeout == curTime: # the intervals between check the detector should be less than a minute
-                    self.detectorValuesDict[detector]['Min Fill Expired'] = True
+            if self.detectorValuesDict[detector]['Valve State'] == True: #only check min fill time for detectors that have open valves
+                if self.detectorValuesDict[detector]['Minimum Fill Timeout'] == False: # if the min time has experied don't check it again
+                    minTimeout = self.detectorValuesDict[detector]['Minimum Fill Timeout']
+                    if minTimeout == curTime: # the intervals between check the detector should be less than a minute
+                        print 'Min Fill Time has Expired', detector
+                        self.detectorValuesDict[detector]['Minimum Fill Expired'] = True
                     
                 
     def checkVentTemp(self):
@@ -203,20 +237,25 @@ class AutoFillInterface():
         Check the vent temperatures on filling detectors and see if it has reached liquid nitrogen temperatures
         '''
         valvesToClose = []
-        detectorValveTemps = self.LJ.readValveTemps(self.enabledDetectors)
-        for (detector,valveTemp) in zip(self.enabledDetectors,detectorValveTemps):
-                if self.detectorValuesDict[detector]['Valve State'] == True:
-                    if self.detectorValuesDict[detector]['Min Fill Expired'] == True:
-                        if valveTemp <= self.LNTemp:
-                            valvesToClose.append(detector)
+#         detectorValveTemps = self.LJ.readValveTemps(self.enabledDetectors)
+        self.readVentTemps()
+        for detector in self.enabledDetectors:
+            ventTemp = self.detectorValuesDict[detector]['Vent Temperature']
+            if self.detectorValuesDict[detector]['Valve State'] == True:
+                if self.detectorValuesDict[detector]['Minimum Fill Expired'] == True:
+                    if ventTemp <= self.LNTemp:
+                        valvesToClose.append(detector)
         numValves = len(valvesToClose)
         if numValves != 0:
             states = [False] * numValves
-            self.LJ.writeValveStates(valvesToClose,states)
-            
+            print 'Closing valves, vent',valvesToClose
+            self.writeValveState(valvesToClose,states)
+            for detector in valvesToClose:
+                self.detectorValuesDict[detector]['Valve State'] = False
+            self.cleanValuesDict(valvesToClose) #clean up the values dict
             
      
-    def checkFillTimout(self):
+    def checkFillTimeout(self):
         '''
         Check to see if any fills have timedout
         '''
@@ -224,22 +263,30 @@ class AutoFillInterface():
         curTime = dt.today().strftime(self.timeFormat)
         for detector in self.enabledDetectors:
             if self.detectorValuesDict[detector]['Valve State'] == True:
-                if curTime == self.detectorValuesDict[detector]['Max Fill Timeout']:
+#                 timeoutTime = curTime + td(minutes=int(self.detetorValuesDict[detector]['Fill Timeout'])
+#                 timeoutStr = tim
+                if curTime == self.detectorValuesDict[detector]['Maximum Fill Timeout']:
                     valvesToClose.append(detector)
                     msg = '%s fill has timed out'%(self.detectorConfigFile[detector]['Name'])
                     self.errorList.append(msg) 
         numValves = len(valvesToClose)
         if numValves != 0:
+            print 'Closing valves, timout',valvesToClose
             states = [False]*numValves
-            self.LJ.writeValveStates(valvesToClose,states)
-        
+            self.writeValveState(valvesToClose,states)
+            for detector in valvesToClose:
+                self.detectorValuesDict[detector]['Valve State'] = False
+            self.cleanValuesDict(valvesToClose)
+            
     def checkDetectorErrors(self):
         '''
         Check the error in the error dict and compose and email body
         '''   
-        if self.errorDict == []: #if no errors 
+        if self.errorList == []: #if no errors 
             self.errorDict = {}
+            self.LJ.writeErrorState(False)
         for error in self.errorList:
+            self.LJ.writeErrorState(True)
             try:
                 self.errorDict[error] += 1
             except KeyError:
@@ -253,6 +300,19 @@ class AutoFillInterface():
                 continue
         return emailBody
     
+    def cleanValuesDict(self,detectors):
+        '''
+        Reset self.detectorValuesDict after a fill has been completed
+        this will reset 'Minimum Fill Timout', 'Minimum Fill Experied', 'Maximum Fill Timout','Fill Started Time'
+        :detectors: - list of detectors to clean up
+        
+        '''
+        for detector in detectors:
+            self.detectorValuesDict[detector]['Minimum Fill Timeout'] = '0:0'
+            self.detectorValuesDict[detector]['Minimum Fill Experied'] = False
+            self.detectorValuesDict[detector]['Maximum Fill Timeout'] = '0:0'
+            self.detectorValuesDict[detector]['Fill Started Time'] = '0:0'
+        
     def sendEmail(self,emailBody):
         '''
         send the email of the errors
@@ -270,15 +330,30 @@ class AutoFillInterface():
             temp = self.detectorValuesDict[detector]['Detector Temperature']
             detStr = '%s current temperature %s\n'%(self.detectorConfigDict['Name'],temp)
             tempString+=detStr
-        emailBody += tempString
+        errorBody += tempString
+        try:
+            server = smtplib.SMTP('localhost') #use the open port to send the message
+        except:
+#             self.EventLog.exception('Tried to contact mail server and failed')
+            return False
+        msg = MIMEText(errorBody+self.emailSignature)
+        msg['Subject'] = 'Dewar Fill Level'
+        msg['From'] = self.senderEmail
+        msg['To'] = self.emailRecipents
+        if ',' in self.emailRecipents: #if there are multiple reciepents then the email has to be split in to a list
+            server.sendmail(self.senderEmail, self.emailRecipents.split(','), msg.as_string()) #note the localhost email must be used
+            #to contaact the server. the baseEmail will show up as the from.
+        else: #else just send the single recipent as a list
+            server.sendmail(self.senderEmail, [self.emailRecipents], msg.as_string())
+        server.quit()  
             
             
     def checkFillInhibit(self):
         '''
         Check the fill inhibit input and turn the light on if needed
         '''
-        state = self.LJ.readInhibitState()
-        self.LJ.writeInhibitState() #write the current state of the inhibit switch to the 
+        state = not self.LJ.readInhibitState() #the switch is normally closed
+        self.LJ.writeInhibitState(state) #write the current state of the inhibit switch to the 
         self.inihibitFills = state
         numDetectors = len(self.enabledDetectors)
         states = [False]*numDetectors
