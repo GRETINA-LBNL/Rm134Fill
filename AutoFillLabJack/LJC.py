@@ -45,6 +45,7 @@ class LJC(object):
             print msg
         self.loadWiring()
         self.configureTemperatureInputs()
+        self.checkRelayPower()
 #         serialnumber = ljm.eReadName(self.controller, 'SERIAL_NUMBER')
 #         print 'LabJack Serial Number: %f\n'%(serialnumber)
         
@@ -70,10 +71,12 @@ class LJC(object):
             self.detectorTempTypeDict[detector] = self.wiringcfg.get(detector,'Detector Temp Type')
             self.valveTempDict[detector] = self.wiringcfg.get(detector,'Valve Temp')
             self.valveTempTypeDict[detector] = self.wiringcfg.get(detector,'Valve Temp Type')
-        self.errorLed = self.wiringcfg.get('Common Settings','Error LED')
-        self.inhibitLed = self.wiringcfg.get('Common Settings','Inhibit LED')
-        self.inhibitInput = self.wiringcfg.get('Common Settings','Inhibit Input')
-        self.heartbeatLed = self.wiringcfg.get('Common Settings','Heartbeat LED')
+        common = 'Common Settings'
+        self.errorLed = self.wiringcfg.get(common,'Error LED')
+        self.inhibitLed = self.wiringcfg.get(common,'Inhibit LED')
+        self.inhibitInput = self.wiringcfg.get(common,'Inhibit Input')
+        self.heartbeatLed = self.wiringcfg.get(common,'Heartbeat LED')
+        self.relayPower = self.wiringcfg.get(common,'Relay Power Check')
         
     def configureTemperatureInputs(self):
         '''
@@ -224,6 +227,19 @@ class LJC(object):
         :state: state to set the heartbeat status to
         '''
         self._LJWriteSingleState(self.heartbeatLed, state)
+    
+    def checkRelayPower(self):
+        '''
+        Check the relay power is on, input CIO0 is connected to the 12VDC power supply
+        If the AC power is not on the DC power will not be on and the input will be 0
+        '''    
+        value = self._LJReadSingleState(self.relayPower)
+        print 'AC power value', value
+        if value == False: #power is off tell the user!
+            msg = 'Relay (AC) Power is Off!'
+            raise LJMError(errorString=msg)
+        elif value == True:
+            return True
         
     def _LJWriteSingleState(self,name,state):
         '''
@@ -256,7 +272,11 @@ class LJC(object):
         '''
         numFrames = len(names)
 #         self.EventLog.debug()
-        ljm.eWriteNames(self.controller, numFrames, names, values)
+        try:
+            ljm.eWriteNames(self.controller, numFrames, names, values)
+        except LJMError:
+            msg = 'Setting %s to values %s'%(names,values)
+            print msg
 #         print 'E',errorAddress
 #         if not errorAddress:
 #             msg = 'Problem with writing to address %f'%errorAddress

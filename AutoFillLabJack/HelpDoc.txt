@@ -1,0 +1,33 @@
+Commands for Auto Fill Control Interface
+Changing Detector Settings
+	set <num> <option> <value> - set detector option to value
+		<num> - detector number 1-6
+		<option> - detector setting that will be changed
+					Short Hand  - Full Name 
+					enabled 	- Fill Enabled 			> enable/disable nitrogen filling for detector
+					schedule 	- Fill Schedule 		> times at which nitrogen filling will start
+					timeout 	- Fill Timeout 			> total time the nitrogen valve is allowed to be open 
+					minimum 	- Minimum Fill Time		> minimum amount of time the nitrogen valve must be open
+					temp 		- Detector Max Temperature > Temperature above which an error is will be set, errors only set when detector is enabled
+					name 		- Detector Name			> name for the detector connected to the detector channel
+		<value> - value option will be set to
+					Depends on the setting see below for special cases
+					Short Hand	- Values
+					enabled		- True/False
+					schedule	- 24 hour time in format HH:MM, for multiple fills in one day use a comma to seperate time '12:01,13:45'
+					timeout		- intiger 1-
+					minimum		- intiger 1-
+					temp		- intiger 1-
+					name		- string
+		Example - set 1 enabled True -> Enables automatic filling of detector 1
+				- set 3 timeout 4 -> sets detector 3 fill timeout to 4 minutes
+				- set 6 schedule 7:50,9:13,22:44 -> set the filling schedule for detector 6 to 7:50am 9:13am and 10:44pm
+							
+Displaying Current Settings
+	get <num> - print the current settings for the detector number
+		<num> - detector channel number 1-6
+
+Display Current Detector Temperatures
+	temp <num> - prints the detector temperature to screen
+		<num> - detector channel number 1-6, 'all' can also be used and all temperatures will be displayed
+		
