@@ -193,7 +193,15 @@ class AutoFillInterface():
         '''
 #         print 'Thread Started'
 #         threadRepeat = 1\
-        self.applyDetectorConfig()
+        
+        error = self.LJ.checkRelayPower()
+        if error:
+            self.errorList.append(error)
+            self.stopRunningEvent.set() #don't let the run start, the relays will not work.
+            self.checkDetectorErrors() #Make sure the error light turns on
+        else:
+            self.stopRunningEvent.clear()
+            self.applyDetectorConfig()
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
@@ -264,32 +272,40 @@ class AutoFillInterface():
             schedule = self.detectorConfigDict[detector]['Fill Schedule']
             if curTimeStr in schedule:
                 if self.detectorValuesDict[detector]['Valve State'] == False: #check to make sure the valve has not already been opened
-                    detectorToOpen.append(detector)
-                    print 'Opening valve for detector', detector
-                    self.detectorValuesDict[detector]['Fill Start'] = curTimeStr
+                    detectorToOpen.append(detector) #make the list of valves to open
+#                     print 'Opening valve for detector', detector
+#                     self.detectorValuesDict[detector]['Fill Start'] = curTimeStr
+# #                     minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
+# #                     maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
+#                     
 #                     minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
 #                     maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
-                    
-                    minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
-                    maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
-                    self.detectorValuesDict[detector]['Minimum Fill Timeout'] = dt.strftime(curTime+minFillDelta,self.timeFormat)
-                    #min time the valve can be opened before 
-                    self.detectorValuesDict[detector]['Minimum Fill Expired'] = False
-                    self.detectorValuesDict[detector]['Maximum Fill Timeout'] = dt.strftime(curTime+maxFillDelta,self.timeFormat)
+#                     self.detectorValuesDict[detector]['Minimum Fill Timeout'] = dt.strftime(curTime+minFillDelta,self.timeFormat)
+#                     #min time the valve can be opened before 
+#                     self.detectorValuesDict[detector]['Minimum Fill Expired'] = False
+#                     self.detectorValuesDict[detector]['Maximum Fill Timeout'] = dt.strftime(curTime+maxFillDelta,self.timeFormat)
                     
                     #max fill time
                     
         numValves = len(detectorToOpen)
         if self.inihibitFills == True:
             if numValves != 0:
-                msg = 'Fill inhibit prevented the a fill from starting'
+                msg = 'Fill inhibit prevented %s from starting a fill'%repr(detectorToOpen)
                 self.errorList.append(msg)                
-        else:
+        else: #if the fills are not inhibited start the filling process
             if numValves != 0:
                 states = [True] *numValves
                 self.writeValveState(detectorToOpen,states)
                 for detector in detectorToOpen:
                     self.detectorValuesDict[detector]['Valve State'] = True
+                    print 'Opening valve for detector', detector
+                    self.detectorValuesDict[detector]['Fill Start'] = curTimeStr
+                    minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
+                    maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
+                    self.detectorValuesDict[detector]['Minimum Fill Timeout'] = dt.strftime(curTime+minFillDelta,self.timeFormat)
+                    #min time the valve can be opened before 
+                    self.detectorValuesDict[detector]['Minimum Fill Expired'] = False
+                    self.detectorValuesDict[detector]['Maximum Fill Timeout'] = dt.strftime(curTime+maxFillDelta,self.timeFormat)
         
     def checkMinFillTime(self):
         '''

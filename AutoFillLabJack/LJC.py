@@ -237,9 +237,10 @@ class LJC(object):
 #         print 'AC power value', value
         if value == False: #power is off tell the user!
             msg = 'Relay (AC) Power is Off!'
-            raise LJMError(errorString=msg)
+            return msg #the error will be handled by the Interface
+#             raise LJMError(errorString=msg)
         elif value == True:
-            return True
+            return None
         
     def _LJWriteSingleState(self,name,state):
         '''

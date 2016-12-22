@@ -212,6 +212,7 @@ class AutoFillGUI():
         '''
         Main input for the user, feeds input to commandInputs() for completing tasks
         '''  
+        print 'Auto Fill program has been started, enter "start" to start auto fill operation.'
         while True:
             if self.exitEvent.is_set() == True:
                 break
