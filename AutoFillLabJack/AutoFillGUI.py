@@ -7,6 +7,7 @@ Created on Sep 16, 2016
 # import time
 from datetime import datetime as dt
 from AutoFillLabJack.AutoFillInterface import AutoFillInterface
+from threading import Event
 class AutoFillGUI():
     '''
     classdocs
@@ -19,10 +20,14 @@ class AutoFillGUI():
         '''
         self.cleanDict = {"Name":str,'Fill Timeout':int,'Minimum Fill Time':int,'Detector Max Temperature':int}
         self.shortHand = {'enabled':'Fill Enabled','schedule':'Fill Schedule','timeout':'Fill Timeout','minimum':'Minimum Fill Time',\
-                          'temp':'Detector Max Temperature'}
+                          'temp':'Detector Max Temperature','name':'Name'}
         
         self.timeFormat = '%H:%M'
+        self.inputSelectDict = {'set':self.detectorSettingsInput,'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,\
+                                'error':self.errorInput,'start':self.startInput,'stop':self.stopInput,'exit':self.exitInput,\
+                                'write':self.writeSettingsInput,'help':self.helpInput}
         
+        self.exitEvent = Event()
     def initInterface(self):
         '''
         Initalize the interface module
@@ -35,6 +40,13 @@ class AutoFillGUI():
             print msg
             raise
         
+    def initRelease(self):
+        '''
+        Release the lab jack and turn everything off
+        '''
+        self.interface.initRelease()
+        del self.interface
+        
     def detectorSettingsInput(self,text):
         '''
         Take the input and confirm it is the correct type
@@ -42,7 +54,10 @@ class AutoFillGUI():
         
         '''
         sptext = text.split(' ')
-        detector = 'Detector %s'%sptext[0]
+        if sptext[0] == 'chill':
+            detector = 'Line Chill'
+        else:
+            detector = 'Detector %s'%sptext[0]
         try:
             option = self.shortHand[sptext[1]] #use the shorthand dict to get the correct option to set
         except KeyError:
@@ -59,7 +74,7 @@ class AutoFillGUI():
                     dt.strptime(time,self.timeFormat)
                 except ValueError:
                     errorString = '%s not a valid fill time in fill schedule %s'%(time,sptext[2])
-                    return False
+                    raise
             value = sptext[2]   
         elif option == 'Fill Enabled': 
             if sptext[2] == 'False': #bool() conversion does not work for strings, do the test long hand 
@@ -69,6 +84,9 @@ class AutoFillGUI():
             else:
                 msg = '%s not a valid setting for Fill Enabled'%sptext[2]
             
+        elif option == 'Name': #the values for names may have spaces in them so join them together
+            values = sptext[2:] #get all the values
+            value = ' '.join(values)
         else:
             try:
                 value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
@@ -92,35 +110,117 @@ class AutoFillGUI():
         '''
         self.interface.writeDetectorSettings(detectors,settings,values)
         
-    def checkDetectorSettings(self,number):
+    def checkDetectorSettingsInput(self,text):
         '''
         Check the detector settings for the 
+        :text: - options for getting detector settings command, '1'
+        full command is 'get 1'
         '''   
-        detector = 'Detector %s'%number
-        print self.interface.readDetectorConfig(detector)
+        name = 'Detector %s'%text
+        print self.interface.readDetectorConfig(name)
     
-    def printHelp(self):
-        '''
-        Print the help file to screen
-        '''
     
-    def detectorTempInput(self,number):
+    def detectorTempInput(self,text):
         '''
         Display the current temperature for the detector number
+        :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
+        total command will be 'temp 1'
         '''   
-        if number == 'all' or number == 'All':
+        if text == 'all' or text == 'All':
             detectors = []
             for num in range(1,7): #1-6
                 detectors.append('Detector %d'%num)
         else:
-            detectors = ['Detector %s'%number]
+            detectors = ['Detector %s'%text]
         temps,names = self.interface.getDetectorTemps(detectors)
         displayString = ''
         for (detector,name,temp) in zip(detectors,names,temps):
             displayString += '%s (%s) temperature %sK\n'%(detector,name,temp)
         print displayString
-            
+    
+    def writeSettingsInput(self,text):
+        '''
+        Write the settings that the user entered using the detectorSettingsInput method
+        '''
+        detectors,settings,values = self.checkDetectorChanges()
+#         print 'Detectors',detectors
+#         print 'Settings', settings
+#         print 'Values', values
+        answer = raw_input('Write the settings show above?')
+        if answer.upper() == 'Y':
+            self.writeDetectorChanges(detectors,settings,values)
+        else:
+            print "Fine I won't\n"
+    
+    def errorInput(self,text):
+        '''
+        Check the interface for any errors
+        :text: - to dispaly error this is empty, to clear errors this will be 'clear'
+        '''
+        if text == 'clear':
+            self.interface.cleanErrorDict()
+        else:
+            errorString = self.interface.readDetectorErrors()
+            print errorString
         
+        
+    def commandInputs(self,text):
+        '''
+        Select the input function baised on the first word in the command
+        :text: - input text from user
+        '''
+        sText = text.split(' ')
+        command = sText.pop(0) # remove the first text entered, it is the command and the rest of the methods will not be use
+        try:
+            inputFunction = self.inputSelectDict[command]
+        except KeyError:
+            msg = "%s not a valid command\n enter 'help' to print help file" %(command)
+            print msg
+            return
+        commandOptions = ' '.join(sText)
+        inputFunction(commandOptions)
+        return True
+    
+    def startInput(self,text):
+        '''
+        start the running thread
+        '''   
+        self.interface.startRunThread()
+        
+    def stopInput(self,text):
+        '''
+        stop the running thread
+        '''
+        self.interface.stopRunThread()
+    
+    def exitInput(self,text):
+        '''
+        Stop the running thread then close everything
+        '''
+        self.interface.initRelease()
+        del self.interface
+        self.exitEvent.set()
+        
+    def helpInput(self,text):
+        '''
+        Print the help file to screen
+        :text: - not used, needed to make it common
+        '''
+        print 'HELP!'
+    
+    def mainInput(self):
+        '''
+        Main input for the user, feeds input to commandInputs() for completing tasks
+        '''  
+        while True:
+            if self.exitEvent.is_set() == True:
+                break
+            answer = raw_input('>>')
+            self.commandInputs(answer)
+            if self.exitEvent.is_set() == True:
+                break
+#             if value == 'exit':
+#                 break
 #     def startWindow(self):
 #         stdscr = curses.initscr()
 #         window = stdscr.subwin(23,79,0,0)

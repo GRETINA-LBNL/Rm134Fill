@@ -1,6 +1,8 @@
 Commands for Auto Fill Control Interface
 Changing Detector Settings
 	set <num> <option> <value> - set detector option to value
+		This command does not change the detector actual detector settings when command is completed, the commands and values entered are stored
+		until the user enters the "write settings"
 		<num> - detector number 1-6
 		<option> - detector setting that will be changed
 					Short Hand  - Full Name 
@@ -23,11 +25,27 @@ Changing Detector Settings
 				- set 3 timeout 4 -> sets detector 3 fill timeout to 4 minutes
 				- set 6 schedule 7:50,9:13,22:44 -> set the filling schedule for detector 6 to 7:50am 9:13am and 10:44pm
 							
+Write Entered Detector Settings
+	write settings - write the setting the user entered using the 'set' command
+	
 Displaying Current Settings
-	get <num> - print the current settings for the detector number
-		<num> - detector channel number 1-6
+	get <detector #> - print the current settings for the detector number
+		<detector #> - Detector to print current settings 'detector 1'
+		Example		 - 'get 2'
 
 Display Current Detector Temperatures
 	temp <num> - prints the detector temperature to screen
 		<num> - detector channel number 1-6, 'all' can also be used and all temperatures will be displayed
-		
+	
+Display and Clear Errors	
+	error - print the error
+	error clear - clear any errors that are currently active, if error coinditions still exists the specific error will continue to report
+
+Stop Filling Program
+	stop - safely turns off the program, closing valves and turning off all lights
+	
+Start Filling Program
+	start - starts filling program
+
+Exit the Filling Program
+	exit - stops the fill program then closes the command line

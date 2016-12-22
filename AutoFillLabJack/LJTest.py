@@ -10,6 +10,7 @@ from AutoFillLabJack.AutoFillGUI import AutoFillGUI
 import ConfigParser
 import time
 from datetime import datetime as dt
+from datetime import timedelta as delta
 
 
 class Test(unittest.TestCase):
@@ -105,15 +106,41 @@ class Test(unittest.TestCase):
         '''
         Test the main running thread with and getting the detector temperature
         '''   
-        print 'Starting Thread!'
-        self.GUI.interface.startRunThread()
-        print 'Thread Started test!'
-        time.sleep(.2)
-        self.GUI.detectorTempInput('2')
-        time.sleep(.2)
-#         self.GUI.detectorTempInput('All')
-        time.sleep(10)
-        self.GUI.interface.stopRunningEvent.set()
+        self.GUI.mainInput()
+#         print 'Starting Thread!'
+#         curTime = dt.today() + delta(minutes=1)
+#         nextTime = dt.today() + delta(minutes=3)
+#         fillString = '%s,%s'%(curTime.strftime('%H:%M'),nextTime.strftime('%H:%M'))
+# #         self.GUI.interface.startRunThread()
+#         self.GUI.commandInputs('start')
+# #         print 'Thread Started test!'
+# #         time.sleep(.2)
+#         self.GUI.commandInputs('set 1 schedule %s'%fillString)
+# #         self.GUI.commandInputs('set 1 enabled True')
+#         self.GUI.commandInputs('set 3 enabled True')
+#         self.GUI.commandInputs('set chill enabled False')
+# #         self.GUI.detectorTempInput('2')
+# #         time.sleep(.2)
+#         self.GUI.writeSettingsInput()
+#         self.GUI.commandInputs('get 1')
+# #         self.GUI.commandInputs('set 4 enabled False')
+# #         self.GUI.commandInputs('set 6 enabled True')
+# #         self.GUI.commandInputs('set 3 enabled False')
+# #         self.GUI.commandInputs('error')
+#         time.sleep(2)
+#         self.GUI.commandInputs('error')
+#         self.GUI.commandInputs('set 3 enabled False')
+#         self.GUI.writeSettingsInput()
+#         self.GUI.commandInputs('error clear')
+# #         self.GUI.writeSettingsInput()
+# #         time.sleep(.4)
+# #         self.GUI.commandInputs('get 1')
+# #         time.sleep(.2)
+# #         self.GUI.commandInputs('error')
+# #         self.GUI.commandInputs('temp All')
+#         time.sleep(320)
+#         self.GUI.commandInputs('stop')
+#         self.GUI.interface.stopRunningEvent.set()
 #     def testInhibit(self):
 #         i = 0
 #         while i < 100000:
@@ -142,7 +169,7 @@ class Test(unittest.TestCase):
 #                 
     def tearDown(self):
         pass
-#         self.interface.initRelease()
+#         self.GUI.initRelease()
 
 
 #     def testLJ(self):

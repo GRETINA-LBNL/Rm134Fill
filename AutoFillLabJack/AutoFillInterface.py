@@ -56,20 +56,14 @@ class AutoFillInterface():
         except:
             print 'Interface did not Initalize'
             raise 
-        self.loadDetectorConfig()
+        self.loadDetectorConfig() 
     
     def initRelease(self):
         '''
         Clean enerything up before closing
         turn off all the leds and valves
         '''  
-        states = [False] * len(self.detectors)
-        self.writeValveState(self.detectors,states)
-        self.writeEnableLEDState(self.detectors, states)
-        self.writeEnableLEDState(['Line Chill'], [False])
-        self.writeValveState(['Line Chill'], [False])
-        self.LJ.writeErrorState(False)
-        self.LJ.writeInhibitState(False)
+        self.stopRunThread()
         self.LJ.releaseInit()
         del self.LJ
         
@@ -147,8 +141,15 @@ class AutoFillInterface():
                                                      'Fill Started Time':'0:0'}
                 if self.detectorConfigDict[detector]['Fill Enabled'] == 'True':
                     self.enabledDetectors.append(detector)
-        self.lineChillEnabled = bool(cnfgFile.get('Line Chill','Enabled'))
+        lineChillEnabled = cnfgFile.get('Line Chill','Fill Enabled')
+        if lineChillEnabled == 'True' or lineChillEnabled == 'False':
+            self.lineChillEnabled = lineChillEnabled
         self.lineChillTimeout = float(cnfgFile.get('Line Chill','Chill Timeout'))
+        
+    def applyDetectorConfig(self):
+        '''
+        Apply the configuration loaded by self.loadDetectorConfig
+        '''
         offStates = [False]*len(self.detectors)
         self.writeEnableLEDState(self.detectors, offStates)
         if len(self.enabledDetectors) != 0: #if there are no enabled detectors then do turn any of the leds on
@@ -161,28 +162,50 @@ class AutoFillInterface():
         '''
         Start the thread that will run
         '''   
+        
         mainThread = threading.Thread(target=self.runThread,name='MainControlThread',args=())
         mainThread.start()
-        print 'end of run start'
+#         print 'end of run start'
+    
+    def stopRunThread(self):
+        '''
+        Stop the MainControlThread 
+        This will do the same thing as initRelease
+        '''   
+        self.stopRunningEvent.set()
+        threads = threading.enumerate()
+        for thread in threads: #join the thread
+            if thread.name == 'MainControlThread':
+                thread.join()
+                
+        states = [False] * len(self.detectors)
+        self.writeValveState(self.detectors,states)
+        self.writeEnableLEDState(self.detectors, states)
+        self.writeEnableLEDState(['Line Chill'], [False])
+        self.writeValveState(['Line Chill'], [False])
+        self.LJ.writeErrorState(False)
+        self.LJ.writeInhibitState(False)
+        self.stopRunningEvent.clear()
         
     def runThread(self):
         '''
         Thread run the detector filling
         '''
 #         print 'Thread Started'
+#         threadRepeat = 1\
+        self.applyDetectorConfig()
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
             # if the check configuration event is set read the configuration list to get a list of enabled detectors and other
-            if self.loadConfigEvent.is_set():
-                self.loadDetectorConfig()
                 
             # check temperatures for any enabled detectors that are above maximun temperature, set error LED and send email is nessassary
+            self.errorList = [] #clean the error list for at the beginning of each run
             self.checkDetectorTemperatures()
             # check enabled detector's settings and start fills if needed
             self.checkFillInhibit()
             self.checkStartDetectorFills()
-            
+#             print 'Detector 1 valve state',self.detectorValuesDict['Detector 1']['Valve State']
             if self.inihibitFills == False: #if the inhibit fills is true no new fills will be started so don't do anyother checking
                 # check currently filling detectors for min fill time breach
                 self.checkMinFillTime()
@@ -191,12 +214,20 @@ class AutoFillInterface():
                 # check for filling timeout, set error and close valve if nessassary 
                 self.checkFillTimeout()
                 #check for errors with filling or detector temperature
-            errorBody = self.checkDetectorErrors()
-            if errorBody != '':
-                print errorBody
+            errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
+#             if errorBody != '':
+#                 print errorBody
             curTime = time.time()
             startScan = curTime + 1
-            while curTime < startScan: #while the thread sleeps check the fill inhibit
+#             print 'Thread repeats',threadRepeat
+#             threadRepeat +=1
+            while curTime < startScan: #while the thread sleeps check the fill inhibit, stoprunning, loadconfig
+                if self.stopRunningEvent.isSet() == True:
+                    break
+                if self.loadConfigEvent.is_set(): # check if the config file has been changed and reload it if nessary
+                    self.loadDetectorConfig()
+                    self.applyDetectorConfig()
+                    self.loadConfigEvent.clear()
                 self.checkFillInhibit()
                 curTime = time.time()
 #             time.sleep(1)
@@ -218,7 +249,7 @@ class AutoFillInterface():
             curTemp = float(self.detectorValuesDict[detector]['Detector Temperature'])
             if curTemp > maxTemp:
                 name = self.detectorConfigDict[detector]['Name']
-                msg = '%s detector temperature has exceeded its max allowed temperature'%(name)
+                msg = '%s (%s) temperature has exceeded its max allowed temperature'%(name,detector)
                 self.errorList.append(msg)
                
         
@@ -267,8 +298,9 @@ class AutoFillInterface():
         curTime = dt.today().strftime(self.timeFormat)
         for detector in self.enabledDetectors:
             if self.detectorValuesDict[detector]['Valve State'] == True: #only check min fill time for detectors that have open valves
-                if self.detectorValuesDict[detector]['Minimum Fill Timeout'] == False: # if the min time has experied don't check it again
+                if self.detectorValuesDict[detector]['Minimum Fill Expired'] == False: # if the min time has experied don't check it again
                     minTimeout = self.detectorValuesDict[detector]['Minimum Fill Timeout']
+#                     print 'Minimum timeout for %s %s'%(detector,minTimeout)
                     if minTimeout == curTime: # the intervals between check the detector should be less than a minute
                         print 'Min Fill Time has Expired', detector
                         self.detectorValuesDict[detector]['Minimum Fill Expired'] = True
@@ -309,15 +341,18 @@ class AutoFillInterface():
 #                 timeoutStr = tim
                 if curTime == self.detectorValuesDict[detector]['Maximum Fill Timeout']:
                     valvesToClose.append(detector)
-                    msg = '%s fill has timed out'%(self.detectorConfigFile[detector]['Name'])
+                    msg = '%s fill has timed out'%(self.detectorConfigDict[detector]['Name'])
                     self.errorList.append(msg) 
         numValves = len(valvesToClose)
         if numValves != 0:
-            print 'Closing valves, timout',valvesToClose
+            print 'Closing valves, timeout',valvesToClose
             states = [False]*numValves
             self.writeValveState(valvesToClose,states)
             for detector in valvesToClose:
                 self.detectorValuesDict[detector]['Valve State'] = False
+                name = self.detectorConfigDict[detector]['Name']
+                msg = '%s (%s) fill experied'%(detector,name)
+                self.errorList.append(msg)
             self.cleanValuesDict(valvesToClose)
             
     def checkDetectorErrors(self):
@@ -325,8 +360,9 @@ class AutoFillInterface():
         Check the error in the error dict and compose and email body
         '''   
         if self.errorList == []: #if no errors 
-            self.errorDict = {}
-            self.LJ.writeErrorState(False)
+            return
+#             self.errorDict = {}
+#             self.LJ.writeErrorState(False)
         for error in self.errorList:
             self.LJ.writeErrorState(True)
             try:
@@ -342,6 +378,18 @@ class AutoFillInterface():
                 continue
         return emailBody
     
+    def readDetectorErrors(self):
+        '''
+        Print the contents of the error dict to the screen
+        '''
+        errorString = ''
+        if self.errorDict == {}:
+            errorString +='No errors have been reported\n'
+        else:
+            for (error,numRepeat) in self.errorDict.iteritems():
+                errorString += '%s has been reported %d times\n'%(error,numRepeat)
+        return errorString
+    
     def cleanValuesDict(self,detectors):
         '''
         Reset self.detectorValuesDict after a fill has been completed
@@ -350,11 +398,22 @@ class AutoFillInterface():
         
         '''
         for detector in detectors:
-            self.detectorValuesDict[detector]['Minimum Fill Timeout'] = '0:0'
-            self.detectorValuesDict[detector]['Minimum Fill Experied'] = False
-            self.detectorValuesDict[detector]['Maximum Fill Timeout'] = '0:0'
-            self.detectorValuesDict[detector]['Fill Started Time'] = '0:0'
-        
+            if 'Line Chill' == detector:
+                continue
+            else:
+                self.detectorValuesDict[detector]['Minimum Fill Timeout'] = '0:0'
+                self.detectorValuesDict[detector]['Minimum Fill Experied'] = False
+                self.detectorValuesDict[detector]['Maximum Fill Timeout'] = '0:0'
+                self.detectorValuesDict[detector]['Fill Started Time'] = '0:0'
+            
+    def cleanErrorDict(self):
+        '''
+        Clean the error dict, only user input will run this method
+        '''    
+        self.errorDict = {}
+        self.LJ.writeErrorState(False)
+        return True
+    
     def sendEmail(self,emailBody):
         '''
         send the email of the errors
@@ -436,9 +495,6 @@ class AutoFillInterface():
         '''
         Collect the changes that will be made by the user and report, the user will reply with yes or no then _writecfg is called to write
         the file
-#         :detector: - string name of detector to be adjusted should be "Detector <#>"
-#         :setting: - Setting to change, ie enabled, min fill timeout
-#         :value: - value the setting will be changed to
         '''   
         detectors = []
         settings = []
@@ -450,7 +506,8 @@ class AutoFillInterface():
                 detectors.append(detector)
                 settings.append(setting)
                 values.append(value)
-                returnString += '%s %s will be set to %s \n'%(detector,setting,value)
+                returnString += '%s %s will be set to: %s \n'%(detector,setting,value)
+        self.detectorChangesDict = {} #clean the dict so the settings will not be repeated
         return detectors,settings,values,returnString
         
     def writeDetectorSettings(self,sections,options,values): 
@@ -466,5 +523,7 @@ class AutoFillInterface():
             cnfgFile.set(section, option, value)
         with open(self.detectorConfigFile, 'w') as FILE:
             cnfgFile.write(FILE)
-        
+        self.loadConfigEvent.set() #set the event that will cause the 
+        self.cleanValuesDict(sections)
+        self.loadDetectorConfig()
         

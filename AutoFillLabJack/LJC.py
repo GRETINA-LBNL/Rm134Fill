@@ -234,7 +234,7 @@ class LJC(object):
         If the AC power is not on the DC power will not be on and the input will be 0
         '''    
         value = self._LJReadSingleState(self.relayPower)
-        print 'AC power value', value
+#         print 'AC power value', value
         if value == False: #power is off tell the user!
             msg = 'Relay (AC) Power is Off!'
             raise LJMError(errorString=msg)
