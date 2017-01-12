@@ -207,6 +207,7 @@ class AutoFillGUI():
         :text: - not used, needed to make it common
         '''
         print 'HELP!'
+        
     
     def mainInput(self):
         '''

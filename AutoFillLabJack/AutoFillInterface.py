@@ -30,7 +30,8 @@ class AutoFillInterface():
         self.detectorChangesDict = {}
         self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
         self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
-        self.detectorSettings = ['Name','Fill Enabled','Fill Schedule','Fill Timeout','Minimum Fill Time','Detector Max Temperature'] #Settings for each
+        self.detectorSettings = ['Name','Fill Enabled','Fill Schedule','Fill Timeout','Minimum Fill Time','Detector Max Temperature']
+         #Settings for each
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
         self.stopRunningEvent = threading.Event()
@@ -144,7 +145,7 @@ class AutoFillInterface():
         lineChillEnabled = cnfgFile.get('Line Chill','Fill Enabled')
         if lineChillEnabled == 'True' or lineChillEnabled == 'False':
             self.lineChillEnabled = lineChillEnabled
-        self.lineChillTimeout = float(cnfgFile.get('Line Chill','Chill Timeout'))
+        self.lineChillTimeout = float(cnfgFile.get('Line Chill','Fill Timeout'))
         
     def applyDetectorConfig(self):
         '''
@@ -542,4 +543,111 @@ class AutoFillInterface():
         self.loadConfigEvent.set() #set the event that will cause the 
         self.cleanValuesDict(sections)
         self.loadDetectorConfig()
+        
+    def checkFillScheduleConflicts(self):
+        '''
+        Check the fill schedule for conflicts between other detector fill schedules, only one detector will be allowed to 
+        fill at a time. Each detector will have exclusive control over the fill valve starting at the scheduled start time
+        and extending to the Fill Timeout. Other detector can not be scheduled for filling during this time. 
+        This check is only done for detectors that are enabled or will become enabled.
+        '''
+        
+        if len(self.enabledDetectors) > 1:
+            startTimes = []
+            timeOuts = []
+            for detector in self.enabledDetectors:
+                times = []
+                fillTime = self.detectorConfigDict[detector]['Fill Schedule'].split(',')
+                for time in fillTime:
+                    times.append(dt.strptime(time,self.timeFormat))
+                startTimes.append(times)
+                timeout = self.detectorConfigDict[detector]['Fill Timeout']
+                timeOuts.append(td(minutes=int(timeout)))
+            return startTimes,timeOuts
+#             startTime = startTimes.pop()
+#             timeOut = timeOuts.pop()
+#             conflicts = ''
+#             for (ST,TO,detector) in zip(startTimes,timeOuts,self.enabledDetectors): #Go through the remaining timeouts and start times
+#                 for S in startTime: #go through the start times for the selected start time
+#                     for T in ST: #go through the selected start times
+#                         if T <= S and T >= timeOut: #If the selected start time falls between the start time and timeout add to the 
+#                             #exclusion list
+#                             conflictString = 'The fill schedule for %s conflicts with %s'
+        #make a list of fill schedules in the same order as enabled detectors, convert to datetime format
+        #make another list of timeouts, convert to datetime format
+        else:
+            return True
+        
+        #make a fill start and end time, check that other fill start times do not fall between start and end time
+    
+    def _checkFillOverlap(self,detectors,schedules,timeouts):
+        '''
+        Check the fill schedule for each detector for overlaping fills within each detector. 
+        Detector fill time is defied as start time + fill timeout 
+        Example of overlaping  schedule -> [[12:10,12:14]] timeout [5]
+        :detectors: - list of detectors to check for overlaps
+        :schedules: - nested list of schedules for each detector, should be each entry should be a datetime object
+        :timeouts: - list of timout values for each detector, items should be timedelta objects
+        '''  
+        overlapString = ''
+        if len(detectors) < 1:
+            return None
+        for (detector,schedule,timeout) in zip(detectors,schedules,timeouts):
+            numFills = len(schedule)
+            if numFills <=1:
+                continue
+            else:
+                SCHStrt = schedule[0]
+                SCHStop = schedule[0] +timeout
+                for i in range(1,numFills):
+                    if schedule[i] <= SCHStop and schedule[i] >= SCHStrt:
+                        Sch1 = dt.strftime(SCHStrt,self.timeFormat)
+                        Sch2 = dt.strftime(schedule[i],self.timeFormat)
+                        Tout = str(timeout).split(':')[1]
+                        overlapString += '%s has Schedule Overlap: %s and %s with timeout: %s min \n'%(detector,Sch1,Sch2,Tout)
+                        
+                    else:
+                        continue
+        return overlapString
+        
+    def _checkFillConflicts(self,detectors,schedules,timeouts):
+        '''
+        Check the fill schedule for conflicts between scheduled fills
+        Detector fill time is defied as start time + fill timeout
+        Example: Detectors -> [Detector 1, Detector 2], schedules -> [[12:13,15:40],[2:22,12:17]], timeouts -> [5,5]
+        :detectors: - list of enabled detectors to check for conflicts
+        :schedules: - nested list of fill schedules for each detector, items should be datetime objects
+        :timeouts: - list of timeout values for the given detector, items should be timedelta objects
+        '''
+        conflictString = ''
+        numDetectors = len(detectors)
+        if numDetectors <=1:
+            return None
+        for i in range(numDetectors): #interate through all the detectors that will be checked
+            detector_i = detectors[i] #set the values that will be checked against all the other detectors, 'master' detector
+            schedule_i = schedules[i] #all detectors need to be master detectors
+            timeout_i = timeouts[i]
+            for h in range(numDetectors):#interage thought all the other detectors, excluding 'master' detector
+                if h == i:
+                    continue
+                else:
+                    detector_h = detectors[h]#get the detector values that will be checked against, 
+                    schedule_h = schedules[h]
+#                     timeout_h = timeouts[h]
+                    for start_i in schedule_i: #cycle through the fill times from the 'master' detector
+                        end_i = start_i + timeout_i #make the filling window
+                        for start_h in schedule_h: #cycle through the detector that will be checked
+                            if start_h >= start_i and start_h <= end_i: # check if detector fill start time is within the window of the 'master'
+                                strTime_i = dt.strftime(start_i,self.timeFormat)
+                                strtime_h = dt.strftime(start_h,self.timeFormat)
+                                strtimeout_i = str(timeout_i).split(':')[1]
+#                                 strtimeout_h = str(timeout_h).split(':')[1]
+                                conStr = '%s fill at %s (timeout %s min) conflicts with %s fill at %s \n'%\
+                                        (detector_i,strTime_i,strtimeout_i,detector_h,strtime_h)
+                                conflictString += conStr
+                            else:
+                                continue
+        return conflictString
+                        
+        
         

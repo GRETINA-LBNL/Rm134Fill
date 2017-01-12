@@ -102,11 +102,11 @@ class Test(unittest.TestCase):
 #         self.GUI.checkDetectorSettings('3')
 #         
      
-    def testTheadTempGet(self):
-        '''
-        Test the main running thread with and getting the detector temperature
-        '''   
-        self.GUI.mainInput()
+#     def testTheadTempGet(self):
+#         '''
+#         Test the main running thread with and getting the detector temperature
+#         '''   
+#         self.GUI.mainInput()
 #         print 'Starting Thread!'
 #         curTime = dt.today() + delta(minutes=1)
 #         nextTime = dt.today() + delta(minutes=3)
@@ -150,6 +150,19 @@ class Test(unittest.TestCase):
 #             elif inhibit == True:
 #                 self.interface.LJ.writeInhibitState(False)
 #             i+=1
+
+    def testScheduleError(self):
+        '''
+        Test the functions that check the schedule for overlaps and conflicts
+        '''
+        startTimes,timeOuts = self.GUI.interface.checkFillScheduleConflicts()
+#         print 'Start Times',startTimes
+#         print 'Time Outs',timeOuts
+        detectors = self.GUI.interface.enabledDetectors
+        errorString = self.GUI.interface._checkFillOverlap(detectors,startTimes,timeOuts)
+        print errorString
+        conflictString = self.GUI.interface._checkFillConflicts(detectors,startTimes,timeOuts)
+        print conflictString
 
 #     def testTemperature(self):
 #         '''
