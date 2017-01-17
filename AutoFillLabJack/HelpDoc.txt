@@ -30,8 +30,8 @@ Write Entered Detector Settings
 	write settings - write the setting entered using the 'set' command to the detector configuration file.
 	
 Load the Detector Configuration file
-	If the user directly edits the configuration file and want to load the new settings
 	load settings - reads and loads the current detector configuration file
+					used when the user directly edits the configuration file and wants to load the new settings
 	
 Displaying Current Settings
 	get <num> - print the current settings for the entered detector number
@@ -48,6 +48,11 @@ Display and Clear Errors
 	error - print the error
 	error clear - clear any errors that are currently active, if error coinditions still exists the specific error will continue to report
 
+Enable/Disable Detector Temperature Logging
+	logging <num> <value> - enable or disable temperature logging for specifided detector
+		<num> - detector number 1-6
+		<value> - True/False
+		
 Stop Filling Program
 	stop - safely turns off the filling thread, closing valves and turning off all lights. Command line interface will still be running
 	

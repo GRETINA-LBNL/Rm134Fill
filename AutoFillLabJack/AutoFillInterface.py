@@ -11,7 +11,8 @@ from datetime import timedelta as td
 import time
 from email.mime.text import MIMEText
 import smtplib
-import time
+import copy
+import logging.config
 
 class AutoFillInterface():
     '''
@@ -28,10 +29,11 @@ class AutoFillInterface():
         self.detectorConfigDict = {} #locations for setting for the detector
         self.detectorValuesDict = {} #storage for the detectors current settings
         self.detectorChangesDict = {}
+        self.tempLoggingDict = {}
         self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
         self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
-        self.detectorSettings = ['Name','Fill Enabled','Fill Schedule','Fill Timeout','Minimum Fill Time','Detector Max Temperature']
-         #Settings for each
+        
+        #Settings for each
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
         self.stopRunningEvent = threading.Event()
@@ -58,6 +60,7 @@ class AutoFillInterface():
             print 'Interface did not Initalize'
             raise 
         self.loadDetectorConfig() 
+        self.getTemperatureLogs()
     
     def initRelease(self):
         '''
@@ -76,8 +79,30 @@ class AutoFillInterface():
             temperatures = self.LJ.readDetectorTemps(self.detectors)
             for (temp,detector) in zip(temperatures,self.detectors):
                 self.detectorValuesDict[detector]['Detector Temperature'] = temp
-#             self.valuesDictLock.notify() #notify the any threads that are waiting for the 
-            
+#             self.valuesDictLock.notify() #notify the any threads that are waiting for the
+ 
+    def logDetectorTemps(self):
+        '''
+        Log the temperature in the approiate log, only detectors that logging has been enabled.
+        This will log every time the rurThread cycles
+        '''
+#         print self.loggingDetectors
+        with self.valuesDictLock:
+            for detector in self.loggingDetectors:
+                    temp = self.detectorValuesDict[detector]['Detector Temperature']
+                    self.tempLoggingDict[detector].info('%.3f K'%temp)
+                    
+    def getTemperatureLogs(self):
+        '''
+        get the temperature logs have have been started
+        grap the event log as well
+        '''
+        logging.config.fileConfig(fname='C:/Python/Rm134Fill/AutoFillLabJack/logging.cfg')
+        self.EventLog = logging.getLogger('EventLog')
+        for detector in self.detectors:
+            name = detector.replace(' ','') + 'Log'
+            self.tempLoggingDict[detector] = logging.getLogger(name)
+        
     def getDetectorTemps(self,detectors):
         '''
         :detectors: list of detector names(string) to read temperature
@@ -126,12 +151,14 @@ class AutoFillInterface():
         cnfgFile = ConfigParser.RawConfigParser()
         cnfgFile.read(self.detectorConfigFile)
         detectors = cnfgFile.get('Detectors','Names').split(',')
+        self.detectorSettings = cnfgFile.get('Detectors','Settings').split(',')
         for detector in detectors:
             config = {}
             for setting in self.detectorSettings:
                 config[setting] = cnfgFile.get(detector, setting)
             self.detectorConfigDict[detector] = config
         self.enabledDetectors = []
+        self.loggingDetectors = []
         self.detectors = []
         self.lineChillEnabled = False
         self.lineChillTimeout = 0
@@ -142,11 +169,13 @@ class AutoFillInterface():
                                                      'Fill Started Time':'0:0'}
                 if self.detectorConfigDict[detector]['Fill Enabled'] == 'True':
                     self.enabledDetectors.append(detector)
+                if self.detectorConfigDict[detector]['Temperature Logging'] == 'True':
+                    self.loggingDetectors.append(detector)
         lineChillEnabled = cnfgFile.get('Line Chill','Fill Enabled')
         if lineChillEnabled == 'True' or lineChillEnabled == 'False':
             self.lineChillEnabled = lineChillEnabled
         self.lineChillTimeout = float(cnfgFile.get('Line Chill','Fill Timeout'))
-        
+       
     def applyDetectorConfig(self):
         '''
         Apply the configuration loaded by self.loadDetectorConfig
@@ -163,9 +192,13 @@ class AutoFillInterface():
         '''
         Start the thread that will run
         '''   
-        
-        mainThread = threading.Thread(target=self.runThread,name='MainControlThread',args=())
-        mainThread.start()
+        errorStr = self.checkFillScheduleConflicts(self.detectorConfigDict, self.enabledDetectors)
+        if errorStr != '':
+            return errorStr
+        else:
+            mainThread = threading.Thread(target=self.runThread,name='MainControlThread',args=())
+            mainThread.start()
+            return ''
 #         print 'end of run start'
     
     def stopRunThread(self):
@@ -206,6 +239,7 @@ class AutoFillInterface():
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
+            self.logDetectorTemps() #log the temps that are enabled.
             # if the check configuration event is set read the configuration list to get a list of enabled detectors and other
                 
             # check temperatures for any enabled detectors that are above maximun temperature, set error LED and send email is nessassary
@@ -544,7 +578,26 @@ class AutoFillInterface():
         self.cleanValuesDict(sections)
         self.loadDetectorConfig()
         
-    def checkFillScheduleConflicts(self):
+    def constructSettingsDict(self,sections,options,values):
+        '''
+        Make the dict of detector settings that will be used to check the fill conflicts and possibly other stuff
+        :sections: - list of sections of to be changed, detector names
+        :options: - list of options within the section to change, name, fill schedule, etc
+        :values: - list of values for the options
+        '''
+        #make a copy of config dict, so it will not be effected when the new dict is constructed
+        settingsDict = copy.deepcopy(self.detectorConfigDict) 
+        for (detector,option,value) in zip(sections,options,values):
+            settingsDict[detector][option] = value #set the new values for the detectors
+        enabledDetectors = []
+        for detector in self.detectors:
+            if settingsDict[detector]['Fill Enabled'] == 'True':
+                enabledDetectors.append(detector)
+            else:
+                continue
+        return settingsDict,enabledDetectors
+    
+    def checkFillScheduleConflicts(self,settingsDict,enabledDetectors):
         '''
         Check the fill schedule for conflicts between other detector fill schedules, only one detector will be allowed to 
         fill at a time. Each detector will have exclusive control over the fill valve starting at the scheduled start time
@@ -552,31 +605,28 @@ class AutoFillInterface():
         This check is only done for detectors that are enabled or will become enabled.
         '''
         
-        if len(self.enabledDetectors) > 1:
+        
+        if len(enabledDetectors) >= 1:
             startTimes = []
             timeOuts = []
-            for detector in self.enabledDetectors:
+            for detector in enabledDetectors:
                 times = []
-                fillTime = self.detectorConfigDict[detector]['Fill Schedule'].split(',')
+                fillTime = settingsDict[detector]['Fill Schedule'].split(',')
                 for time in fillTime:
                     times.append(dt.strptime(time,self.timeFormat))
                 startTimes.append(times)
                 timeout = self.detectorConfigDict[detector]['Fill Timeout']
                 timeOuts.append(td(minutes=int(timeout)))
-            return startTimes,timeOuts
-#             startTime = startTimes.pop()
-#             timeOut = timeOuts.pop()
-#             conflicts = ''
-#             for (ST,TO,detector) in zip(startTimes,timeOuts,self.enabledDetectors): #Go through the remaining timeouts and start times
-#                 for S in startTime: #go through the start times for the selected start time
-#                     for T in ST: #go through the selected start times
-#                         if T <= S and T >= timeOut: #If the selected start time falls between the start time and timeout add to the 
-#                             #exclusion list
-#                             conflictString = 'The fill schedule for %s conflicts with %s'
-        #make a list of fill schedules in the same order as enabled detectors, convert to datetime format
-        #make another list of timeouts, convert to datetime format
+            errorStr = self._checkFillOverlap(enabledDetectors, startTimes, timeOuts)
+            errorStr += self._checkFillConflicts(enabledDetectors, startTimes, timeOuts)
+            if errorStr != '':
+                return errorStr
+            else:
+                return ''
+#             return startTimes,timeOuts
+
         else:
-            return True
+            return ''
         
         #make a fill start and end time, check that other fill start times do not fall between start and end time
     
@@ -591,7 +641,7 @@ class AutoFillInterface():
         '''  
         overlapString = ''
         if len(detectors) < 1:
-            return None
+            return overlapString
         for (detector,schedule,timeout) in zip(detectors,schedules,timeouts):
             numFills = len(schedule)
             if numFills <=1:
@@ -622,7 +672,7 @@ class AutoFillInterface():
         conflictString = ''
         numDetectors = len(detectors)
         if numDetectors <=1:
-            return None
+            return conflictString
         for i in range(numDetectors): #interate through all the detectors that will be checked
             detector_i = detectors[i] #set the values that will be checked against all the other detectors, 'master' detector
             schedule_i = schedules[i] #all detectors need to be master detectors
