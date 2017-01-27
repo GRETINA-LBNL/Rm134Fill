@@ -13,7 +13,7 @@ from email.mime.text import MIMEText
 import smtplib
 import copy
 import logging.config
-
+import socket
 class AutoFillInterface():
     '''
     classdocs
@@ -30,9 +30,15 @@ class AutoFillInterface():
         self.detectorValuesDict = {} #storage for the detectors current settings
         self.detectorChangesDict = {}
         self.tempLoggingDict = {}
-        self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
-        self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
-        
+	hostname = socket.gethostname()
+	if hostname == 'MMStrohmeier-S67':
+            self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
+            self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
+	    self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\logging.cfg'
+        elif hostname == 'localhost':
+	    self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
+	    self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
+	    self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
         #Settings for each
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
@@ -97,7 +103,7 @@ class AutoFillInterface():
         get the temperature logs have have been started
         grap the event log as well
         '''
-        logging.config.fileConfig(fname='C:/Python/Rm134Fill/AutoFillLabJack/logging.cfg')
+        logging.config.fileConfig(fname=self.loggingConfigFile)
         self.EventLog = logging.getLogger('EventLog')
         for detector in self.detectors:
             name = detector.replace(' ','') + 'Log'
