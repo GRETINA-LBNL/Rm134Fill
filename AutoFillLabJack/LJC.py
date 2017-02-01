@@ -42,7 +42,7 @@ class LJC(object):
 #             print ljm.eReadName(self.controller,'SERIAL_NUMBER')
         except LJMError as ljerror:
             msg = 'Could not init LabJack %s'%ljerror._errorString
-            print msg
+            raise
         self.loadWiring()
         self.configureTemperatureInputs()
         self.checkRelayPower()

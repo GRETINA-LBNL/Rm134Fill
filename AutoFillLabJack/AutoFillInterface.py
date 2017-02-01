@@ -30,15 +30,15 @@ class AutoFillInterface():
         self.detectorValuesDict = {} #storage for the detectors current settings
         self.detectorChangesDict = {}
         self.tempLoggingDict = {}
-	hostname = socket.gethostname()
-	if hostname == 'MMStrohmeier-S67':
+        hostname = socket.gethostname()
+        if hostname == 'MMStrohmeier-S67':
             self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
-	    self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\logging.cfg'
+            self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
         elif hostname == 'localhost':
-	    self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
-	    self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
-	    self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
+            self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
+            self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
+            self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
         #Settings for each
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
@@ -63,7 +63,8 @@ class AutoFillInterface():
             self.LJ = LJC(cnfgFile)
             self.LJ.controllerInit()
         except:
-            print 'Interface did not Initalize'
+            self.EventLog.error('LabJack Failed to initalize')
+#             print 'Interface did not Initalize'
             raise 
         self.loadDetectorConfig() 
         self.getTemperatureLogs()

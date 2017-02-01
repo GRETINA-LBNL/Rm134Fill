@@ -28,6 +28,7 @@ class AutoFillGUI():
                                 'write':self.writeSettingsInput,'help':self.helpInput}
         
         self.exitEvent = Event()
+        
     def initInterface(self):
         '''
         Initalize the interface module
