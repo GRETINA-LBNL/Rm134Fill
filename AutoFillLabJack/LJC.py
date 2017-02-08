@@ -6,6 +6,7 @@ Created on Sep 15, 2016
 from labjack import ljm
 from labjack.ljm.ljm import LJMError
 from time import sleep
+import logging
 # from multiprocessing.managers import State
 # from ConfigParser import RawConfigParser
 
@@ -31,6 +32,7 @@ class LJC(object):
         self.extendedFeaturesIndex = {'None':0,
                                       'Thermocouple K':22,
                                       'RTD PT100':40}
+        self.EventLog = logging.getLogger('EventLog')
         
     
     def controllerInit(self):
@@ -42,6 +44,7 @@ class LJC(object):
 #             print ljm.eReadName(self.controller,'SERIAL_NUMBER')
         except LJMError as ljerror:
             msg = 'Could not init LabJack %s'%ljerror._errorString
+            self.EventLog.error(msg)
             raise
         self.loadWiring()
         self.configureTemperatureInputs()
@@ -56,6 +59,7 @@ class LJC(object):
 #         print 'release'
         try:
             ljm.close(self.controller)
+            self.EventLog.info('Releasing LabJack Controller')
         except:
             return
     
@@ -63,6 +67,7 @@ class LJC(object):
         '''
         Read the wiring config file that contains port names for the detector items (enable LED, Valve Control, etc)
         '''
+        self.EventLog.debug('Loading wiring config file.')
         self.detectorList = self.wiringcfg.get('Detectors','Names').split(',')
         for detector in self.detectorList:
             self.enableLEDDict[detector] = self.wiringcfg.get(detector,'Enable LED')
@@ -103,7 +108,9 @@ class LJC(object):
         '''
         
 #         ljm.eWriteName(self.controller,EF_name,index)
+        
         for (name,configuration) in zip(names,configurations):
+            self.EventLog.debug('Configuring analog input %s for thermocouples.'%name)
             index = self.extendedFeaturesIndex[configuration]
             EF_name = name+'_EF_INDEX'
             CONFIG_A_Name = name+'_EF_CONFIG_A'
@@ -121,15 +128,17 @@ class LJC(object):
         :configurations: - type of rtds to configure
         :names:- names of analog inuputs that will be used
         '''
+        
         for (name,configuration) in zip(names,configurations):
+            self.EventLog.debug('Configuring analog input %s for RTD.'%name)
             EF_name = name+'_EF_INDEX'
-            CONFIG_A_Name = name+'_EF_CONFIG_A'
-            CONFIG_B_Name = name+'_EF_CONFIG_B'
-            CONFIG_D_Name = name+'_EF_CONFIG_D'
-            CONFIG_E_Name = name+'_EF_CONFIG_E'
+            CONFIG_A_Name = name+'_EF_CONFIG_A' #temperature display
+            CONFIG_B_Name = name+'_EF_CONFIG_B' #excitation circuit
+            CONFIG_D_Name = name+'_EF_CONFIG_D' #excitation Voltage
+            CONFIG_E_Name = name+'_EF_CONFIG_E' #excitation resistance
             index = self.extendedFeaturesIndex[configuration]
             setting_names =  [EF_name,CONFIG_A_Name,CONFIG_B_Name,CONFIG_D_Name,CONFIG_E_Name]
-            setting_values = [index,   2,               0,         55.56,           255.7]
+            setting_values = [index,  1,            4,            2.500,        1000]
             ljm.eWriteNames(self.controller, 5, setting_names, setting_values)
             
             
@@ -142,6 +151,7 @@ class LJC(object):
         for detector in detectorList:
             names.append(self.valveTempDict[detector]) #build the list of port names for the requested temperature
         names_readA = map(lambda x: x+'_EF_READ_A', names) #adjust the name to read with the EF options
+        self.EventLog.debug('Reading vent temperatures from %s'%repr(names_readA))
         stringTemps = self._LJReadValues(names_readA) #return the values
         return stringTemps
 #         return map(lambda x: float(x),stringTemps) #conver to list of floats
@@ -154,7 +164,9 @@ class LJC(object):
         names = []
         for detector in detectorList:
             names.append(self.detectorTempDict[detector]) #build the list of port names for the requested temperature
-        return self._LJReadValues(names) #return the values
+        names_readA = map(lambda x: x+'_EF_READ_A', names) #adjust the name to read with the EF options
+        self.EventLog.debug('Reading detector temps from %s.'%repr(names))
+        return self._LJReadValues(names_readA) #return the values
             
     def writeValveStates(self,detectorList, valveStates):
         '''
@@ -170,6 +182,7 @@ class LJC(object):
                 values.append(1)
             elif value == False:
                 values.append(0)
+        self.EventLog.debug('Writing fill valve states %s to %s'%(values,names))
         return self._LJWriteValues(names,values) #return the values  
     
     def writeEnableLEDState(self,detectorList,ledStates):
@@ -186,6 +199,7 @@ class LJC(object):
                 values.append(1)
             elif value == False:
                 values.append(0)
+        self.EventLog.debug('Writing %s to enable leds for %s'%(values,names))
         return self._LJWriteValues(names,values) #return the values  
     
     def writeErrorState(self,state):
@@ -193,6 +207,7 @@ class LJC(object):
         Turn the error led on or off
         :state: - state to set the led
         '''   
+        self.EventLog.debug('Writing error led to %s'%state)
         self._LJWriteSingleState(self.errorLed, state)
         
     def writeInhibitState(self,state):
@@ -200,6 +215,7 @@ class LJC(object):
         wite the state to the inhibit led
         :state: state to ste the inhibit let to, bool
         '''
+        self.EventLog.debug('Writing inhibit led to %s'%state)
         self._LJWriteSingleState(self.inhibitLed, state)
         
     def readInhibitState(self):

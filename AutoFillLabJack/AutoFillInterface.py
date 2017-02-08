@@ -13,14 +13,15 @@ from email.mime.text import MIMEText
 import smtplib
 import copy
 import logging.config
-import socket
+import sys
+# import socket
 class AutoFillInterface():
     '''
     classdocs
     '''
 
 
-    def __init__(self):
+    def __init__(self,eventLog,hostname):
         '''
         Constructor
         '''
@@ -30,15 +31,16 @@ class AutoFillInterface():
         self.detectorValuesDict = {} #storage for the detectors current settings
         self.detectorChangesDict = {}
         self.tempLoggingDict = {}
-        hostname = socket.gethostname()
+        self.EventLog = eventLog
+#         hostname = socket.gethostname()
         if hostname == 'MMStrohmeier-S67':
             self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
-            self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
+#             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
         elif hostname == 'localhost':
             self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
-            self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
+#             self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
         #Settings for each
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
@@ -63,7 +65,7 @@ class AutoFillInterface():
             self.LJ = LJC(cnfgFile)
             self.LJ.controllerInit()
         except:
-            self.EventLog.error('LabJack Failed to initalize')
+            self.EventLog.error(sys.exc_info()[0]) #log the error from the labjack
 #             print 'Interface did not Initalize'
             raise 
         self.loadDetectorConfig() 
@@ -104,8 +106,8 @@ class AutoFillInterface():
         get the temperature logs have have been started
         grap the event log as well
         '''
-        logging.config.fileConfig(fname=self.loggingConfigFile)
-        self.EventLog = logging.getLogger('EventLog')
+#         logging.config.fileConfig(fname=self.loggingConfigFile)
+#         self.EventLog = logging.getLogger('EventLog')
         for detector in self.detectors:
             name = detector.replace(' ','') + 'Log'
             self.tempLoggingDict[detector] = logging.getLogger(name)
@@ -155,6 +157,7 @@ class AutoFillInterface():
         '''
         Load the data from the configuration file for each detector
         '''
+        self.EventLog.info('Load Detector Configuration from %s'%self.detectorConfigFile)
         cnfgFile = ConfigParser.RawConfigParser()
         cnfgFile.read(self.detectorConfigFile)
         detectors = cnfgFile.get('Detectors','Names').split(',')
@@ -301,6 +304,7 @@ class AutoFillInterface():
                 name = self.detectorConfigDict[detector]['Name']
                 msg = '%s (%s) temperature has exceeded its max allowed temperature'%(name,detector)
                 self.errorList.append(msg)
+                self.EventLog.info(msg)
                
         
     def checkStartDetectorFills(self):
@@ -334,6 +338,7 @@ class AutoFillInterface():
             if numValves != 0:
                 msg = 'Fill inhibit prevented %s from starting a fill'%repr(detectorToOpen)
                 self.errorList.append(msg)                
+                self.EventLog.info(msg)
         else: #if the fills are not inhibited start the filling process
             if numValves != 0:
                 states = [True] *numValves
@@ -348,6 +353,7 @@ class AutoFillInterface():
                     #min time the valve can be opened before 
                     self.detectorValuesDict[detector]['Minimum Fill Expired'] = False
                     self.detectorValuesDict[detector]['Maximum Fill Timeout'] = dt.strftime(curTime+maxFillDelta,self.timeFormat)
+                    self.EventLog.info('Opening fill valve for %s'%detector)
         
     def checkMinFillTime(self):
         '''
@@ -362,6 +368,7 @@ class AutoFillInterface():
                     if minTimeout == curTime: # the intervals between check the detector should be less than a minute
                         print 'Min Fill Time has Expired', detector
                         self.detectorValuesDict[detector]['Minimum Fill Expired'] = True
+                        self.EventLog.debug('Miminum Fill Time Experied for %s'%detector)
                     
                 
     def checkVentTemp(self):
@@ -384,6 +391,7 @@ class AutoFillInterface():
             self.writeValveState(valvesToClose,states)
             for detector in valvesToClose:
                 self.detectorValuesDict[detector]['Valve State'] = False
+                self.EventLog.info('Closing %s fill valve, LN2 temperature reached'%detector)
             self.cleanValuesDict(valvesToClose) #clean up the values dict
             
      
@@ -411,6 +419,7 @@ class AutoFillInterface():
                 name = self.detectorConfigDict[detector]['Name']
                 msg = '%s (%s) fill experied'%(detector,name)
                 self.errorList.append(msg)
+                self.EventLog.info('Closing %s fill valve, fill timeout reached'%detector)
             self.cleanValuesDict(valvesToClose)
             
     def checkDetectorErrors(self):
@@ -445,7 +454,9 @@ class AutoFillInterface():
             errorString +='No errors have been reported\n'
         else:
             for (error,numRepeat) in self.errorDict.iteritems():
-                errorString += '%s has been reported %d times\n'%(error,numRepeat)
+                msg = '%s has been reported %d times\n'%(error,numRepeat)
+                errorString += msg
+                self.EventLog.info(msg)
         return errorString
     
     def cleanValuesDict(self,detectors):

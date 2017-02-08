@@ -8,6 +8,10 @@ Created on Sep 16, 2016
 from datetime import datetime as dt
 from AutoFillLabJack.AutoFillInterface import AutoFillInterface
 from threading import Event
+import logging.config
+import socket
+
+
 class AutoFillGUI():
     '''
     classdocs
@@ -26,15 +30,21 @@ class AutoFillGUI():
         self.inputSelectDict = {'set':self.detectorSettingsInput,'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,\
                                 'error':self.errorInput,'start':self.startInput,'stop':self.stopInput,'exit':self.exitInput,\
                                 'write':self.writeSettingsInput,'help':self.helpInput}
-        
+        self.hostname = socket.gethostname()
+        if self.hostname == 'MMStrohmeier-S67':
+            self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
+        elif self.hostname == 'localhost':
+            self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
+        self.getLogs()
         self.exitEvent = Event()
+        
         
     def initInterface(self):
         '''
         Initalize the interface module
         '''
         try:
-            self.interface = AutoFillInterface()
+            self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
             self.interface.initController()
         except:
             msg = 'Interface failed to initalize'
@@ -47,6 +57,16 @@ class AutoFillGUI():
         '''
         self.interface.initRelease()
         del self.interface
+    
+    
+    def getLogs(self):
+        '''
+        get the temperature logs have have been started
+        grap the event log as well
+        '''
+        logging.config.fileConfig(fname=self.loggingConfigFile)
+        self.EventLog = logging.getLogger('EventLog')
+        
         
     def detectorSettingsInput(self,text):
         '''
@@ -105,6 +125,7 @@ class AutoFillGUI():
                 print errorString
                 return False
         self.interface.changeDetectorSetting(detector,option,value)
+        self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
         
     def checkDetectorChanges(self):
         '''
@@ -145,7 +166,6 @@ class AutoFillGUI():
             print self.interface.readDetectorConfig(name)
         
     
-    
     def detectorTempInput(self,text):
         '''
         Display the current temperature for the detector number
@@ -174,9 +194,10 @@ class AutoFillGUI():
 #         print 'Detectors',detectors
 #         print 'Settings', settings
 #         print 'Values', values
-        answer = raw_input('Write the settings show above?')
+        answer = raw_input('Write the settings show above(Y/n)?')
         if answer.upper() == 'Y':
             self.writeDetectorChanges(detectors,settings,values)
+            print 'Settings have been written'
         else:
             print "Fine I won't\n"
     
@@ -187,6 +208,7 @@ class AutoFillGUI():
         '''
         if text == 'clear':
             self.interface.cleanErrorDict()
+            self.EventLog.info('Cleaning error log')
         else:
             errorString = self.interface.readDetectorErrors()
             print errorString
@@ -238,7 +260,9 @@ class AutoFillGUI():
         :text: - not used, needed to make it common
         '''   
         error = self.interface.startRunThread()
+        self.EventLog.info('Starting Auto Fill Operation')
         if error != '': #problems in the fill schedule are checked for before a run is started.
+            self.EventLog.info('Starting Stopped, error: %s'%error)
             print error
         
     def stopInput(self,text):
@@ -246,6 +270,7 @@ class AutoFillGUI():
         stop the running thread
         :text: - not used, needed to make it common
         '''
+        self.EventLog.info('Stopping Auto Fill Operation')
         self.interface.stopRunThread()
     
     def exitInput(self,text):
@@ -255,6 +280,7 @@ class AutoFillGUI():
         '''
         self.interface.initRelease()
         del self.interface
+        self.EventLog.info('Exiting Auto Fill Program')
         self.exitEvent.set()
         
     def helpInput(self,text):
@@ -274,6 +300,7 @@ class AutoFillGUI():
             if self.exitEvent.is_set() == True:
                 break
             answer = raw_input('>>')
+            self.EventLog.debug('Entered command: %s'%answer)
             self.commandInputs(answer)
             if self.exitEvent.is_set() == True:
                 break
