@@ -12,8 +12,11 @@ import time
 from email.mime.text import MIMEText
 import smtplib
 import copy
-import logging.config
+import logging
 import sys
+import matplotlib.pyplot as plt
+
+# from __builtin__ import file
 # import socket
 class AutoFillInterface():
     '''
@@ -36,10 +39,12 @@ class AutoFillInterface():
         if hostname == 'MMStrohmeier-S67':
             self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
+            self.logDir = "C:\Python\Rm134Fill\AutoFillLabJack\Logs"
 #             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
         elif hostname == 'localhost':
             self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
+            self.logDir = '/home/gretina/Rm134Fill/Logs'
 #             self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
         #Settings for each
         self.loadConfigEvent = threading.Event()
@@ -718,4 +723,31 @@ class AutoFillInterface():
         return conflictString
                         
         
+    def graphDetectorTemp(self,detName):
+        '''
+        Make a plot of the recorded temperatures for the give detector number
+        :detName: - detector number string that the graph will be made,
+        '''
+        logFile = self.logDir+'%sLog.txt'%detName
         
+        with self.valuesDictLock: #get the values dict lock to prevent logDetectorTemp from grabbing the log file
+            with open(logFile, 'r') as FILE:
+                detectorTemps = FILE.readlines() #read all the
+        temps = []
+        times = []
+        for line in detectorTemps:
+            line = line.strip('\r')
+            sline = line.split('|')
+            times.append(dt.strptime(self.timeFormat,sline[0]))
+            temps.append(float(sline[1]))
+        normalFig = plt.figure()
+        normalFig.set_size_inches(12,8,forward=True)
+#         subtitle = 'Beam Cocktail: %s, Data Date %s'%(self.dataDict[filenames[0]]['Cocktail'],self.dataDate)
+        normalFig.canvas.set_window_title('Percent Difference from Calibrated Fluence with Offset from %s'%self.date)
+        subtitle = 'Temperature Vs Date'
+        normalFig.suptitle(subtitle,fontsize=15)
+        normalax = normalFig.add_subplot(111)
+        normalax.plot(times,temps,marker='_',label='%s Temperature Log'%detName)
+        normalax.set_ylabel('Date')
+        normalax.set_xlabel('Detector Temperature (C)')
+        plt.show(block=True)
