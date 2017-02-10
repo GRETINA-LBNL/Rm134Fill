@@ -16,6 +16,8 @@ write - writes entered settings to auto fill configuration
 temp <num> - displays current detector temp,
 	'all' is a valid number
 --
+graph <num> - displays temperatures stored in the current temperature log
+--
 load - load the config file, generally after changes have been made to the file
 --
 error - display the currently set errors

@@ -29,7 +29,7 @@ class AutoFillGUI():
         self.timeFormat = '%H:%M'
         self.inputSelectDict = {'set':self.detectorSettingsInput,'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,\
                                 'error':self.errorInput,'start':self.startInput,'stop':self.stopInput,'exit':self.exitInput,\
-                                'write':self.writeSettingsInput,'help':self.helpInput}
+                                'write':self.writeSettingsInput,'graph':self.graphInput,'help':self.helpInput}
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
@@ -290,6 +290,17 @@ class AutoFillGUI():
         '''
         print 'HELP!'
         
+    def graphInput(self,text):
+        '''
+        Produce a graph the detector temperature for the given detector number
+        '''
+#         detNum = text.split(' ')[1]
+        if text in ['1','2','3','4','5','6']:
+            detName = 'Detector %s'%text
+            self.interface.graphTempData(detName)
+        else:
+            msg = '"%s" not a valid detector number'%text
+            print msg
     
     def mainInput(self):
         '''

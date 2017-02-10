@@ -120,8 +120,9 @@ class LJC(object):
             CONFIG_D_Name = name+'_EF_CONFIG_D'
             CONFIG_E_Name = name+'_EF_CONFIG_E'
             setting_names = [EF_name,CONFIG_A_Name,CONFIG_B_Name,CONFIG_D_Name,CONFIG_E_Name]
-            setting_values = [index,    2,              0,           55.56,        255.37]
-            ljm.eWriteNames(self.controller, 4, setting_names, setting_values)
+            setting_values = [index,    1,              0,           55.56,        255.37]
+            numFrames = len(setting_values)
+            ljm.eWriteNames(self.controller, numFrames, setting_names, setting_values)
 #             ljm.eWriteName(self.controller, name, index)
             
     def configureRTDRegisters(self,configurations,names):
@@ -141,7 +142,8 @@ class LJC(object):
             index = self.extendedFeaturesIndex[configuration]
             setting_names =  [EF_name,CONFIG_A_Name,CONFIG_B_Name,CONFIG_D_Name,CONFIG_E_Name]
             setting_values = [index,  1,            4,            2.500,        1000]
-            ljm.eWriteNames(self.controller, 5, setting_names, setting_values)
+            numFrames = len(setting_values)
+            ljm.eWriteNames(self.controller, numFrames, setting_names, setting_values)
             
             
     def readVentTemps(self,detectorList):
