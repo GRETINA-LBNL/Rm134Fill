@@ -15,6 +15,7 @@ import copy
 import logging
 import sys
 import matplotlib.pyplot as plt
+import matplotlib.dates as pltdates
 
 # from __builtin__ import file
 # import socket
@@ -39,24 +40,26 @@ class AutoFillInterface():
         if hostname == 'MMStrohmeier-S67':
             self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
-            self.logDir = "C:\Python\Rm134Fill\AutoFillLabJack\Logs"
+            self.logDir = "C:\Python\Rm134Fill\AutoFillLabJack\Logs\\"#the last \ can not be alone
 #             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
         elif hostname == 'localhost':
             self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
-            self.logDir = '/home/gretina/Rm134Fill/Logs'
+            self.logDir = '/home/gretina/Rm134Fill/Logs/'
 #             self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
         #Settings for each
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
         self.stopRunningEvent = threading.Event()
         self.timeFormat = '%H:%M'
+	self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
         self.LNTemp = 83.0 #Temperature in kelvin
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.valuesDictLock = threading.Lock()
         self.configDictLock = threading.Lock()
+	self.pollTime = 30
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
        
@@ -104,7 +107,7 @@ class AutoFillInterface():
         with self.valuesDictLock:
             for detector in self.loggingDetectors:
                     temp = self.detectorValuesDict[detector]['Detector Temperature']
-                    self.tempLoggingDict[detector].info('%.3f K'%temp)
+                    self.tempLoggingDict[detector].info('%.3f C'%temp)
                     
     def getTemperatureLogs(self):
         '''
@@ -252,6 +255,7 @@ class AutoFillInterface():
         else:
             self.stopRunningEvent.clear()
             self.applyDetectorConfig()
+	    self.LJ.heartbeatFlash()
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
@@ -277,7 +281,7 @@ class AutoFillInterface():
 #             if errorBody != '':
 #                 print errorBody
             curTime = time.time()
-            startScan = curTime + 1
+            startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
 #             threadRepeat +=1
             while curTime < startScan: #while the thread sleeps check the fill inhibit, stoprunning, loadconfig
@@ -729,28 +733,35 @@ class AutoFillInterface():
         Make a plot of the recorded temperatures for the give detector number
         :detName: - detector number string that the graph will be made,
         '''
-        logFile = self.logDir+'%sLog.txt'%detName
+        detName = detName.replace(' ','') #take the space out of detector name to match file name
+	logFile = self.logDir+'%sLog.txt'%detName
         
         with self.valuesDictLock: #get the values dict lock to prevent logDetectorTemp from grabbing the log file
             with open(logFile, 'r') as FILE:
                 detectorTemps = FILE.readlines() #read all the
         temps = []
         times = []
+        dataDate = detectorTemps[0].split('|')[0].split(' ')[0] #Log files only record for one day, get that date
         for line in detectorTemps:
             line = line.strip('\r')
             sline = line.split('|')
-            times.append(dt.strptime(self.timeFormat,sline[0]))
-            temps.append(float(sline[1]))
+            dateNum = pltdates.date2num(dt.strptime(sline[0],self.loggingTimeFormat))
+            times.append(dateNum)
+            cleanTemp = sline[1].replace(' C','')
+            temps.append(float(cleanTemp))
         normalFig = plt.figure()
-        normalFig.set_size_inches(12,8,forward=True)
+        normalFig.set_size_inches(12,6,forward=True)
 #         subtitle = 'Beam Cocktail: %s, Data Date %s'%(self.dataDict[filenames[0]]['Cocktail'],self.dataDate)
-        normalFig.canvas.set_window_title('Percent Difference from Calibrated Fluence with Offset from %s'%self.date)
-        subtitle = 'Temperature Vs Date'
+        normalFig.canvas.set_window_title('Temperature Vs Time for %s'%detName)
+        subtitle = 'Temperature Vs Time'
         normalFig.suptitle(subtitle,fontsize=15)
         normalax = normalFig.add_subplot(111)
-        normalax.plot_date(times,temps,marker='_',label='%s Temperature Log'%detName)
-        normalax.set_ylabel('Date')
-        normalax.set_xlabel('Detector Temperature (C)')
+        normalax.plot_date(times,temps,'-',linewidth=1.0,label='%s Temperature Log'%detName)
+        normalax.set_xlabel('Date (%s)'%dataDate)
+        normalax.set_ylabel('Detector Temperature (C)')
+        normalax.autoscale_view()
+        xaxisFormat = pltdates.DateFormatter('%H:%M:%S') #only show the time the data was taken, its only from one day
+        normalax.xaxis.set_major_formatter(xaxisFormat)
         plt.show(block=True)
         
         
