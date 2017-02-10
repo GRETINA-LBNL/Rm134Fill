@@ -84,8 +84,9 @@ class AutoFillInterface():
         Clean enerything up before closing
         turn off all the leds and valves
         '''  
-        self.stopRunThread()
-        self.LJ.releaseInit()
+        self.stopRunThread(exit=True)
+        self.LJ.releaseInitFlash()
+	self.LJ.releaseInit()
         del self.LJ
         
     def readDetectorTemps(self):
@@ -219,7 +220,7 @@ class AutoFillInterface():
             return ''
 #         print 'end of run start'
     
-    def stopRunThread(self):
+    def stopRunThread(self,exit=False):
         '''
         Stop the MainControlThread 
         This will do the same thing as initRelease
@@ -237,7 +238,8 @@ class AutoFillInterface():
         self.writeValveState(['Line Chill'], [False])
         self.LJ.writeErrorState(False)
         self.LJ.writeInhibitState(False)
-        self.LJ.stopOperationFlash() #let the user know everything has stopped
+	if exit ==False: #another type of flash will be used when exiting the program
+            self.LJ.stopOperationFlash() #let the user know everything has stopped
         self.stopRunningEvent.clear()
         
     def runThread(self):
@@ -255,7 +257,7 @@ class AutoFillInterface():
         else:
             self.stopRunningEvent.clear()
             self.applyDetectorConfig()
-	    self.LJ.heartbeatFlash()
+#	    self.LJ.heartbeatFlash()
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
@@ -284,6 +286,7 @@ class AutoFillInterface():
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
 #             threadRepeat +=1
+            self.LJ.heartbeatFlash() #flash the heart beat before any breaks can happen, different flash is used when stopping thread 
             while curTime < startScan: #while the thread sleeps check the fill inhibit, stoprunning, loadconfig
                 if self.stopRunningEvent.isSet() == True:
                     break
@@ -297,8 +300,6 @@ class AutoFillInterface():
     #             self.sendEmail(errorBody)
         
         # repeat
-        # flash the heatbeat light
-            self.LJ.heartbeatFlash()
     #         return True
          
     
