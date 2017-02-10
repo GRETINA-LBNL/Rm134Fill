@@ -234,6 +234,7 @@ class AutoFillInterface():
         self.writeValveState(['Line Chill'], [False])
         self.LJ.writeErrorState(False)
         self.LJ.writeInhibitState(False)
+        self.LJ.stopOperationFlash() #let the user know everything has stopped
         self.stopRunningEvent.clear()
         
     def runThread(self):

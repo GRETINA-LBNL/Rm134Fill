@@ -238,6 +238,18 @@ class LJC(object):
         sleep(.03)
         self.writeHeartbeatState(False)
       
+    def stopOperationFlash(self):
+        '''
+        Flash the heatbeat light to let the operator know the filling operation has stopped
+        Two long flashes
+        '''   
+        self.writeHeartbeatState(True)
+        sleep(.07)
+        self.writeHeartbeatState(False)
+        sleep(.03)
+        self.writeHeartbeatState(True)
+        sleep(.07)
+        self.writeHeartbeatState(False)
         
     def writeHeartbeatState(self,state):
         '''
