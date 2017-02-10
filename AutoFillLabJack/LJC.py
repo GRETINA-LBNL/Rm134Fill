@@ -92,11 +92,13 @@ class LJC(object):
         thermoTypesList = []
         rtdTypesList = []
         for detector in  self.detectorList:
-            thermoNamesList.append(self.detectorTempDict[detector])
-            rtdNamesList.append(self.valveTempDict[detector])
+            thermoNamesList.append(self.valveTempDict[detector])
+            rtdNamesList.append(self.detectorTempDict[detector])
             thermoTypesList.append(self.valveTempTypeDict[detector]) #valves use thermocouples to read temperature
             rtdTypesList.append(self.detectorTempTypeDict[detector]) #detectors use rtds to read inputs
-        self.configureRTDRegisters(rtdTypesList, rtdNamesList)
+#        self.EventLog.debug("Setting %s to RTD"%repr(rtdNamesList))
+	self.configureRTDRegisters(rtdTypesList, rtdNamesList)
+#	self.EventLog.debug("Setting %s to Thermocouple"%repr(thermoNamesList))
         self.configureThermocoupleRegisters(thermoTypesList,thermoNamesList)
         
         
@@ -110,7 +112,7 @@ class LJC(object):
 #         ljm.eWriteName(self.controller,EF_name,index)
         
         for (name,configuration) in zip(names,configurations):
-            self.EventLog.debug('Configuring analog input %s for thermocouples.'%name)
+            self.EventLog.debug('Configuring analog input %s for Thermocouple.'%name)
             index = self.extendedFeaturesIndex[configuration]
             EF_name = name+'_EF_INDEX'
             CONFIG_A_Name = name+'_EF_CONFIG_A'

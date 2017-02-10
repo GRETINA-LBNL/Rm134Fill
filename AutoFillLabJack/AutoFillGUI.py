@@ -181,7 +181,7 @@ class AutoFillGUI():
         temps,names = self.interface.getDetectorTemps(detectors)
         displayString = ''
         for (detector,name,temp) in zip(detectors,names,temps):
-            displayString += '%s (%s) temperature %sK\n'%(detector,name,temp)
+            displayString += '%s (%s) temperature %sC\n'%(detector,name,temp)
         print displayString
     
     def writeSettingsInput(self,text):
@@ -247,7 +247,7 @@ class AutoFillGUI():
         try:
             inputFunction = self.inputSelectDict[command]
         except KeyError:
-            msg = '%s" not a valid command\n enter <help> to print help file' %(command)
+            msg = '"%s" not a valid command\n enter <help> to print help file' %(command)
             print msg
             return
         commandOptions = ' '.join(sText)

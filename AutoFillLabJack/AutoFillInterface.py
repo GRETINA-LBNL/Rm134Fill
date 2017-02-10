@@ -52,6 +52,7 @@ class AutoFillInterface():
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.valuesDictLock = threading.Lock()
         self.configDictLock = threading.Lock()
+	self.pollTime = 30
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
        
@@ -99,7 +100,7 @@ class AutoFillInterface():
         with self.valuesDictLock:
             for detector in self.loggingDetectors:
                     temp = self.detectorValuesDict[detector]['Detector Temperature']
-                    self.tempLoggingDict[detector].info('%.3f K'%temp)
+                    self.tempLoggingDict[detector].info('%.3f C'%temp)
                     
     def getTemperatureLogs(self):
         '''
@@ -246,6 +247,7 @@ class AutoFillInterface():
         else:
             self.stopRunningEvent.clear()
             self.applyDetectorConfig()
+	    self.LJ.heartbeatFlash()
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
@@ -271,7 +273,7 @@ class AutoFillInterface():
 #             if errorBody != '':
 #                 print errorBody
             curTime = time.time()
-            startScan = curTime + 1
+            startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
 #             threadRepeat +=1
             while curTime < startScan: #while the thread sleeps check the fill inhibit, stoprunning, loadconfig
