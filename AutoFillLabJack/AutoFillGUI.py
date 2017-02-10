@@ -297,7 +297,7 @@ class AutoFillGUI():
 #         detNum = text.split(' ')[1]
         if text in ['1','2','3','4','5','6']:
             detName = 'Detector %s'%text
-            self.interface.graphTempData(detName)
+            self.interface.graphDetectorTemp(detName)
         else:
             msg = '"%s" not a valid detector number'%text
             print msg
