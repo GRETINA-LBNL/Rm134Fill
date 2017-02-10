@@ -747,7 +747,10 @@ class AutoFillInterface():
         subtitle = 'Temperature Vs Date'
         normalFig.suptitle(subtitle,fontsize=15)
         normalax = normalFig.add_subplot(111)
-        normalax.plot(times,temps,marker='_',label='%s Temperature Log'%detName)
+        normalax.plot_date(times,temps,marker='_',label='%s Temperature Log'%detName)
         normalax.set_ylabel('Date')
         normalax.set_xlabel('Detector Temperature (C)')
         plt.show(block=True)
+        
+        
+        
