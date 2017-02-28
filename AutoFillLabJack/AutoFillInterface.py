@@ -16,6 +16,7 @@ import logging
 import sys
 import matplotlib.pyplot as plt
 import matplotlib.dates as pltdates
+import psutil
 
 # from __builtin__ import file
 # import socket
@@ -52,14 +53,14 @@ class AutoFillInterface():
         self.fillInhibitEvent = threading.Event()
         self.stopRunningEvent = threading.Event()
         self.timeFormat = '%H:%M'
-	self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
+        self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
         self.LNTemp = 83.0 #Temperature in kelvin
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.valuesDictLock = threading.Lock()
         self.configDictLock = threading.Lock()
-	self.pollTime = 30
+        self.pollTime = 30
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
        
@@ -255,7 +256,7 @@ class AutoFillInterface():
         else:
             self.stopRunningEvent.clear()
             self.applyDetectorConfig()
-	    self.LJ.heartbeatFlash()
+            self.LJ.heartbeatFlash()
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
@@ -280,6 +281,7 @@ class AutoFillInterface():
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
 #                 print errorBody
+            self.getMemoryUsage() #check the memory usage
             curTime = time.time()
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
@@ -734,7 +736,7 @@ class AutoFillInterface():
         :detName: - detector number string that the graph will be made,
         '''
         detName = detName.replace(' ','') #take the space out of detector name to match file name
-	logFile = self.logDir+'%sLog.txt'%detName
+        logFile = self.logDir+'%sLog.txt'%detName
         
         with self.valuesDictLock: #get the values dict lock to prevent logDetectorTemp from grabbing the log file
             with open(logFile, 'r') as FILE:
@@ -765,4 +767,11 @@ class AutoFillInterface():
         plt.show(block=True)
         
         
-        
+    def getMemoryUsage(self):
+        '''
+        I think the ram might be filling up and causing the segmentation error
+        get it and log it in the event log
+        '''
+        mem = psutil.virtual_memory()
+        msg = "Current Memory usage %.2f"%mem.percent
+        self.EventLog.info(msg)
