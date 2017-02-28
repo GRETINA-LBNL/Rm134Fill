@@ -246,13 +246,22 @@ class LJC(object):
         Two long flashes
         '''   
         self.writeHeartbeatState(True)
-        sleep(.07)
+        sleep(.15)
         self.writeHeartbeatState(False)
-        sleep(.03)
+        sleep(.15)
         self.writeHeartbeatState(True)
-        sleep(.07)
+        sleep(.15)
         self.writeHeartbeatState(False)
-        
+    
+    def releaseInitFlash(self):
+        '''
+	Flash the heatbeat light to let the operator know the filling program will closed, ie exit was called
+
+
+        '''
+	self.writeHeartbeatState(True)
+	sleep(0.3)
+	self.writeHeartbeatState(False) 
     def writeHeartbeatState(self,state):
         '''
         Write the state of the heartbeat led, ie on or off
