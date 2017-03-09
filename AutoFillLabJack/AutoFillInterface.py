@@ -284,7 +284,7 @@ class AutoFillInterface():
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
 #                 print errorBody
-            self.getMemoryUsage() #check the memory usage
+#            self.getMemoryUsage() #check the memory usage
             curTime = time.time()
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
@@ -775,5 +775,5 @@ class AutoFillInterface():
         get it and log it in the event log
         '''
         mem = psutil.virtual_memory()
-        msg = "Current Memory usage %.2f"%mem.percent
+        msg = "Current Memory usage %.2f%%"%mem.percent
         self.EventLog.info(msg)
