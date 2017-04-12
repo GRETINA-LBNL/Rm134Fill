@@ -16,7 +16,7 @@ import logging
 import sys
 import matplotlib.pyplot as plt
 import matplotlib.dates as pltdates
-import psutil
+#import psutil
 
 # from __builtin__ import file
 # import socket
