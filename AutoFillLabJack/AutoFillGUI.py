@@ -171,13 +171,18 @@ class AutoFillGUI():
         Display the current temperature for the detector number
         :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
         total command will be 'temp 1'
-        '''   
-        if text == 'all' or text == 'All':
-            detectors = []
-            for num in range(1,7): #1-6
-                detectors.append('Detector %d'%num)
+        '''
+	detectorNumbers = map(lambda x: str(x),range(1,7))
+	detectors = []   
+        if text in detectorNumbers:
+            detectors.append('Detector %s'%text)
         else:
-            detectors = ['Detector %s'%text]
+	    if text == 'All' or text == 'all':
+	        for num in detectorNumbers:
+	            detectors.append('Detector %s'%num)
+	    else:
+	        errorString = '"%s" not a valid detector name'%text
+	        print errorString
         temps,names = self.interface.getDetectorTemps(detectors)
         displayString = ''
         for (detector,name,temp) in zip(detectors,names,temps):
@@ -340,6 +345,6 @@ class AutoFillGUI():
         
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
-#     AutoFillGUI.startWindow()
+    AutoFillGUI.startWindow()
 #     AutoFillGUI.addText()
 #     AutoFillGUI.endWindow()

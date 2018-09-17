@@ -298,7 +298,11 @@ class AutoFillInterface():
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
 #                 print errorBody
+<<<<<<< HEAD
 #             self.getMemoryUsage() #check the memory usage
+=======
+#            self.getMemoryUsage() #check the memory usage
+>>>>>>> refs/heads/MergeMaster
             curTime = time.time()
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
@@ -787,6 +791,7 @@ class AutoFillInterface():
         '''
         Start the thread that runs the socket for the remote client
         '''
+<<<<<<< HEAD
         socketThread = threading.Thread(target=self.socketThread,name='SocketThread',args=())
         socketThread.start()
             
@@ -839,3 +844,8 @@ class AutoFillInterface():
 #         mem = psutil.virtual_memory()
 #         msg = "Current Memory usage %.2f"%mem.percent
 #         self.EventLog.info(msg)
+=======
+        mem = psutil.virtual_memory()
+        msg = "Current Memory usage %.2f%%"%mem.percent
+        self.EventLog.info(msg)
+>>>>>>> refs/heads/MergeMaster
