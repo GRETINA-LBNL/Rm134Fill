@@ -243,7 +243,7 @@ class AutoFillGUI():
         :text: - input text from user
         '''
         sText = text.split(' ')
-        command = sText.pop(0) # remove the first text entered, it is the command and the rest of the methods will not be use
+        command = sText.pop(0) # remove the first text entered, it is the command and the rest of the methods will not be used
         try:
             inputFunction = self.inputSelectDict[command]
         except KeyError:
@@ -286,7 +286,7 @@ class AutoFillGUI():
     def helpInput(self,text):
         '''
         Print the help file to screen
-        :text: - not used, needed to make it common
+        :text: - not used, needed to make it these input functions common
         '''
         print 'HELP!'
         
@@ -340,6 +340,6 @@ class AutoFillGUI():
         
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
-    AutoFillGUI.startWindow()
+#     AutoFillGUI.startWindow()
 #     AutoFillGUI.addText()
 #     AutoFillGUI.endWindow()

@@ -17,7 +17,7 @@ Entering Detector Settings
 					Depends on the setting see below for special cases
 					Short Hand	- Values
 					enabled		- True/False
-					schedule	- 24 hour time in format HH:MM, for multiple fills in one day use a comma to seperate time '12:01,13:45'
+					schedule	- 24 hour time in format HH:MM, for multiple fills in one day use a comma to seperate times '12:01,13:45'
 					timeout		- minutes, intiger 1-60
 					minimum		- minutes, intiger 1-60
 					temp		- degrees K, intiger 1-400
