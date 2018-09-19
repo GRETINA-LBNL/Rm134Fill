@@ -52,15 +52,21 @@ class AutoFillInterface():
         self.loadConfigEvent = threading.Event()
         self.fillInhibitEvent = threading.Event()
         self.stopRunningEvent = threading.Event()
+        self.initReleaseEvent = threading.Event() #Event to stop the socket listening thread and close everything
         self.timeFormat = '%H:%M'
         self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
-        self.LNTemp = 83.0 #Temperature in kelvin
+        self.ventCloseThresholdTemp = -160 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.valuesDictLock = threading.Lock()
         self.configDictLock = threading.Lock()
+#         self.infoGatherLock = threading.Lock()
+        self.remoteCmdDict = {'get':self.readDetectorConfig,'temp':self.getDetectorTemps,
+                                'error':self.readDetectorErrors}
         self.pollTime = 30
+        self.HOST = 'localhost'
+        self.PORT = 50088
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
        
@@ -85,10 +91,18 @@ class AutoFillInterface():
         Clean enerything up before closing
         turn off all the leds and valves
         '''  
-        self.stopRunThread(exit=True)
+        self.stopRunThread(EXIT=True)
+        self.initReleaseEvent.set()
+        threads = threading.enumerate()
+        for thread in threads: #Stop the thread that runs the communication socket
+            if thread.name == 'SocketThread':
+                thread.join()
+
         self.LJ.releaseInitFlash()
-	self.LJ.releaseInit()
+        self.LJ.releaseInit()
         del self.LJ
+    
+    
         
     def readDetectorTemps(self):
         '''
@@ -221,7 +235,7 @@ class AutoFillInterface():
             return ''
 #         print 'end of run start'
     
-    def stopRunThread(self,exit=False):
+    def stopRunThread(self,EXIT=False):
         '''
         Stop the MainControlThread 
         This will do the same thing as initRelease
@@ -239,7 +253,7 @@ class AutoFillInterface():
         self.writeValveState(['Line Chill'], [False])
         self.LJ.writeErrorState(False)
         self.LJ.writeInhibitState(False)
-        if exit ==False: #another type of flash will be used when exiting the program
+        if EXIT == False: #another type of flash will be used when exiting the program
             self.LJ.stopOperationFlash() #let the user know everything has stopped
         self.stopRunningEvent.clear()
         
@@ -259,15 +273,14 @@ class AutoFillInterface():
             self.stopRunningEvent.clear()
             self.applyDetectorConfig()
             self.LJ.heartbeatFlash()
-
+        self.errorList = [] #clean the error list for at the beginning of each run
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
             self.readDetectorTemps()
             self.logDetectorTemps() #log the temps that are enabled.
-            # if the check configuration event is set read the configuration list to get a list of enabled detectors and other
-                
+            # if the check configuration event is set read the configuration list to get a list of enabled detectors and other  
             # check temperatures for any enabled detectors that are above maximun temperature, set error LED and send email is nessassary
-            self.errorList = [] #clean the error list for at the beginning of each run
+            
             self.checkDetectorTemperatures()
             # check enabled detector's settings and start fills if needed
             self.checkFillInhibit()
@@ -284,7 +297,7 @@ class AutoFillInterface():
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
 #                 print errorBody
-#            self.getMemoryUsage() #check the memory usage
+#             self.getMemoryUsage() #check the memory usage
             curTime = time.time()
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
@@ -396,7 +409,7 @@ class AutoFillInterface():
             ventTemp = self.detectorValuesDict[detector]['Vent Temperature']
             if self.detectorValuesDict[detector]['Valve State'] == True:
                 if self.detectorValuesDict[detector]['Minimum Fill Expired'] == True:
-                    if ventTemp <= self.LNTemp:
+                    if ventTemp <= self.ventCloseThresholdTemp:
                         valvesToClose.append(detector)
         numValves = len(valvesToClose)
         if numValves != 0:
@@ -769,11 +782,60 @@ class AutoFillInterface():
         plt.show(block=True)
         
         
-    def getMemoryUsage(self):
+    def startSocketThread(self):
         '''
-        I think the ram might be filling up and causing the segmentation error
-        get it and log it in the event log
+        Start the thread that runs the socket for the remote client
         '''
-        mem = psutil.virtual_memory()
-        msg = "Current Memory usage %.2f%%"%mem.percent
+        socketThread = threading.Thread(target=self.socketThread,name='SocketThread',args=())
+        socketThread.start()
+            
+            
+    def socketThread(self):
+        '''
+        Thread that will listen to the socket and reply to data sent to it. The thread is started at the when the interface is 
+        started. It is stopped when init release is called
+        '''
+        SOC = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        SOC.bind((self.HOST,self.PORT))
+        SOC.listen(1)
+        conn,addr = SOC.accept()
+        msg = 'Address %s has been connected to socket'%addr
         self.EventLog.info(msg)
+        while True:
+            cmd = conn.recv(1024)
+            replyData = self._socketCommandRequest(cmd)
+            conn.send(replyData)
+            if self.initReleaseEvent.is_set():
+                break
+        conn.close()
+        
+    def _socketCommandRequest(self,commandString):
+        '''
+        Take the data received from the socket and decide what function needs to be called, which will gather the proper data
+        Inputs:
+            :commandString: - String received from the socket, example 'get Detector 1' -> get the current settings for detector 1
+                              The strings may contain mulitple commans separated by a ','
+        '''
+        if ',' in commandString:
+            cmds = commandString.split(',')
+        else:
+            cmds = [commandString]
+        returnString = ''
+        for cmd in cmds:
+            scmd = cmd.split(' ')
+            cmdType = scmd.pop(0)
+            cmdFunction = self.remoteCmdDict[cmdType]
+            cmdText = ' '.join(scmd)
+            data = cmdFunction(cmdText)
+            returnString += ', %s'%data
+        return returnString
+    
+#     def getMemoryUsage(self):
+#         '''
+#         I think the ram might be filling up and causing the segmentation error
+#         get it and log it in the event log
+#         '''
+#         mem = psutil.virtual_memory()
+#         msg = "Current Memory usage %.2f"%mem.percent
+#         self.EventLog.info(msg)
+

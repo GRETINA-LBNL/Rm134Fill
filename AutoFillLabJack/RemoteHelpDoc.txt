@@ -1,0 +1,15 @@
+Commands for Remote Monitor System
+    Display Current Settings for Detector Channel
+        get <num> - Gather and display the current settings for detector channel number <num>
+            <num> - values 1-6 or 'chill'; 'chill' will return the current settings for
+                    the line chill valve
+            Example - get 3 -> display the current settings for detector 2 channel
+    
+    Display Current Detector Temperature
+        temp <num> - Gather and display the current temperature for detector <num>
+             <num> - values 1-6 or 'all'
+             Example - temp all -> print the current detector temperature for all channels
+             
+     Display Current System Errors
+        error - Gather and display any errors stored in the system
+            Example - error -> print errors to screen
