@@ -56,7 +56,7 @@ class AutoFillInterface():
         self.initReleaseEvent = threading.Event() #Event to stop the socket listening thread and close everything
         self.timeFormat = '%H:%M'
         self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
-        self.ventCloseThresholdTemp = -160 #Temp of vent at which fill valve will be closed.
+        self.ventCloseThresholdTemp = -230 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
@@ -298,11 +298,7 @@ class AutoFillInterface():
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
 #                 print errorBody
-<<<<<<< HEAD
-#             self.getMemoryUsage() #check the memory usage
-=======
-#            self.getMemoryUsage() #check the memory usage
->>>>>>> refs/heads/MergeMaster
+
             curTime = time.time()
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
@@ -791,7 +787,6 @@ class AutoFillInterface():
         '''
         Start the thread that runs the socket for the remote client
         '''
-<<<<<<< HEAD
         socketThread = threading.Thread(target=self.socketThread,name='SocketThread',args=())
         socketThread.start()
             
@@ -844,8 +839,4 @@ class AutoFillInterface():
 #         mem = psutil.virtual_memory()
 #         msg = "Current Memory usage %.2f"%mem.percent
 #         self.EventLog.info(msg)
-=======
-        mem = psutil.virtual_memory()
-        msg = "Current Memory usage %.2f%%"%mem.percent
-        self.EventLog.info(msg)
->>>>>>> refs/heads/MergeMaster
+
