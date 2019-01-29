@@ -345,6 +345,6 @@ class AutoFillGUI():
         
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
-    AutoFillGUI.startWindow()
+#    AutoFillGUI.startWindow()
 #     AutoFillGUI.addText()
 #     AutoFillGUI.endWindow()

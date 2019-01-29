@@ -55,7 +55,7 @@ class AutoFillInterface():
         self.initReleaseEvent = threading.Event() #Event to stop the socket listening thread and close everything
         self.timeFormat = '%H:%M'
         self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
-        self.ventCloseThresholdTemp = -160 #Temp of vent at which fill valve will be closed.
+        self.ventCloseThresholdTemp = -230 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
