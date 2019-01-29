@@ -292,16 +292,10 @@ class AutoFillInterface():
                 # for filling detectrors check for vent temp reaching LN levels
                 self.checkVentTemp()
                 # check for filling timeout, set error and close valve if nessassary 
-                self.checkFillTimeout()
+                self.checkFillTimeout(>>
                 #check for errors with filling or detector temperature
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
-#                 print errorBody
-<<<<<<< HEAD
-#             self.getMemoryUsage() #check the memory usage
-=======
-
->>>>>>> c46a82017a13128a52416b4ea7911cf2016e83dc
             curTime = time.time()
             startScan = curTime + self.pollTime
 #             print 'Thread repeats',threadRepeat
@@ -789,11 +783,7 @@ class AutoFillInterface():
     def startSocketThread(self):
         '''
         Start the thread that runs the socket for the remote client
-<<<<<<< HEAD
-        '''
-=======
-        '''
->>>>>>> c46a82017a13128a52416b4ea7911cf2016e83dc
+	'''
         socketThread = threading.Thread(target=self.socketThread,name='SocketThread',args=())
         socketThread.start()
             
@@ -819,7 +809,7 @@ class AutoFillInterface():
         
     def _socketCommandRequest(self,commandString):
         '''
-        Take the data received from the socket and decide what function needs to be called, which will gather the proper data
+        Take the data received from the socket and decides what function needs to be called, which will gather the proper data
         Inputs:
             :commandString: - String received from the socket, example 'get Detector 1' -> get the current settings for detector 1
                               The strings may contain mulitple commans separated by a ','
