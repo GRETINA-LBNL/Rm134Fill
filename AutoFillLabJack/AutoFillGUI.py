@@ -356,8 +356,12 @@ class AutoFillGUI():
         
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
+<<<<<<< HEAD
     AutoFillGUI.initInterface()
     AutoFillGUI.mainInput()
 #     AutoFillGUI.startWindow()
+=======
+#    AutoFillGUI.startWindow()
+>>>>>>> branch 'master' of https://github.com/GRETINA-LBNL/Rm134Fill.git
 #     AutoFillGUI.addText()
 #     AutoFillGUI.endWindow()
