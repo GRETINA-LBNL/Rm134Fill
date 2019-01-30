@@ -33,8 +33,12 @@ class AutoFillGUI():
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
+            self.helpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\HelpDoc.txt'
+            self.miniHelpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\MiniHelpDoc.txt'
         elif self.hostname == 'localhost':
             self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
+            self.helpFile = '/home/gretina/Rm134Fill/AutoFillLabJack/HelpDoc.txt'
+            self.miniHelpFile = '/home/gretina/Rm134FillAutoFillLabJack/MiniHelpDoc.txt'
         self.getLogs()
         self.exitEvent = Event()
         
@@ -172,17 +176,16 @@ class AutoFillGUI():
         :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
         total command will be 'temp 1'
         '''
-	detectorNumbers = map(lambda x: str(x),range(1,7))
-	detectors = []   
+        detectorNumbers = map(lambda x: str(x),range(1,7))
+        detectors = []   
         if text in detectorNumbers:
             detectors.append('Detector %s'%text)
+        if text == 'All' or text == 'all':
+            for num in detectorNumbers:
+                detectors.append('Detector %s'%num)
         else:
-	    if text == 'All' or text == 'all':
-	        for num in detectorNumbers:
-	            detectors.append('Detector %s'%num)
-	    else:
-	        errorString = '"%s" not a valid detector name'%text
-	        print errorString
+            errorString = '"%s" not a valid detector name'%text
+            print errorString
         temps,names = self.interface.getDetectorTemps(detectors)
         displayString = ''
         for (detector,name,temp) in zip(detectors,names,temps):
@@ -291,9 +294,17 @@ class AutoFillGUI():
     def helpInput(self,text):
         '''
         Print the help file to screen
-        :text: - not used, needed to make it these input functions common
+        :text: - 
         '''
-        print 'HELP!'
+        
+        if text == 'all':
+            fileName = self.HelpDoc
+        elif text == '':
+            fileName = self.MiniHelpDoc
+        with open(fileName, 'r') as helpFile:
+            print helpFile.read()
+        
+#         print 'HELP!'
         
     def graphInput(self,text):
         '''
@@ -345,6 +356,8 @@ class AutoFillGUI():
         
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
-    AutoFillGUI.startWindow()
+    AutoFillGUI.initInterface()
+    AutoFillGUI.mainInput()
+#     AutoFillGUI.startWindow()
 #     AutoFillGUI.addText()
 #     AutoFillGUI.endWindow()
