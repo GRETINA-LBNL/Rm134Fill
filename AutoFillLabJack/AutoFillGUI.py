@@ -28,7 +28,7 @@ class AutoFillGUI():
         
         self.timeFormat = '%H:%M'
         self.inputSelectDict = {'set':self.detectorSettingsInput,'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,\
-                                'error':self.errorInput,'start':self.startInput,'stop':self.stopInput,'exit':self.exitInput,\
+                               'error':self.errorInput,'start':self.startInput,'stop':self.stopInput,'exit':self.exitInput,\
                                 'write':self.writeSettingsInput,'graph':self.graphInput,'help':self.helpInput}
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
@@ -45,12 +45,23 @@ class AutoFillGUI():
         '''
         try:
             self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
-            self.interface.initController()
+            msg = self.interface.initController()
         except:
             msg = 'Interface failed to initalize'
-            print msg
+            print "Warning:", msg
             raise
-        
+        if msg != None:
+            print "Warning:", msg
+
+    def checkThreadRunning(self):
+        '''
+        Check if the thread that does everything is running and notify the user if the thread is not
+        running. Used in some of the input functions
+        '''
+        status = self.interface.threadRunningCheck()
+        if status == False:
+            print "Warning: Operation thread is not running, detector values will not be updated"
+
     def initRelease(self):
         '''
         Release the lab jack and turn everything off
@@ -148,7 +159,7 @@ class AutoFillGUI():
         '''
         After the user has confirmed the settings are correct write them to the config file
         '''
-        
+        self.checkThreadRunning()
         self.interface.writeDetectorSettings(detectors,settings,values)
         
     def checkDetectorSettingsInput(self,text):
@@ -172,8 +183,9 @@ class AutoFillGUI():
         :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
         total command will be 'temp 1'
         '''
-	detectorNumbers = map(lambda x: str(x),range(1,7))
-	detectors = []   
+        detectorNumbers = map(lambda x: str(x),range(1,7))
+        detectors = []   
+        self.checkThreadRunning()
         if text in detectorNumbers:
             detectors.append('Detector %s'%text)
         else:
@@ -312,6 +324,7 @@ class AutoFillGUI():
         Main input for the user, feeds input to commandInputs() for completing tasks
         '''  
         print 'Auto Fill program has been started, enter "start" to start auto fill operation.'
+        self.initInterface()
         while True:
             if self.exitEvent.is_set() == True:
                 break
@@ -345,6 +358,7 @@ class AutoFillGUI():
         
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
+    AutoFillGUI.mainInput()
 #    AutoFillGUI.startWindow()
 #     AutoFillGUI.addText()
 #     AutoFillGUI.endWindow()

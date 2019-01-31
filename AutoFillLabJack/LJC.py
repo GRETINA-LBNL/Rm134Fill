@@ -4,9 +4,10 @@ Created on Sep 15, 2016
 @author: ADonoghue
 '''
 from labjack import ljm
-from labjack.ljm.ljm import LJMError
+from labjack.ljm import LJMError
 from time import sleep
 import logging
+
 # from multiprocessing.managers import State
 # from ConfigParser import RawConfigParser
 
@@ -41,14 +42,32 @@ class LJC(object):
         '''
         try:
             self.controller = ljm.openS('T7', 'USB', '470013817')
+            self.loadWiring()
+            
 #             print ljm.eReadName(self.controller,'SERIAL_NUMBER')
+           
         except LJMError as ljerror:
-            msg = 'Could not init LabJack %s'%ljerror._errorString
+            msg = 'Could not find LabJack %s'%ljerror._errorString
             self.EventLog.error(msg)
-            raise
-        self.loadWiring()
+            raise   
+        ''' 
+        When the controller is initalized it has some trouble connecting so try
+        a couple of time before declaring a problem
+        '''
+        i=0 
+        while i<3:        
+            try:
+                self.checkRelayPower()
+                i=5
+            except LJMError as ljerror:
+                msg = "Connection not made: %s"%ljerror._errorString
+                i+=1
+        if i==3:
+            raise LJMError(errorString = msg)
         self.configureTemperatureInputs()
-        self.checkRelayPower()
+        msg = self.checkRelayPower()
+        return msg
+
 #         serialnumber = ljm.eReadName(self.controller, 'SERIAL_NUMBER')
 #         print 'LabJack Serial Number: %f\n'%(serialnumber)
         

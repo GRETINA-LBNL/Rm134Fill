@@ -4,6 +4,7 @@ Created on Sep 26, 2016
 @author: ADonoghue
 '''
 import threading
+from labjack.ljm import LJMError
 from AutoFillLabJack.LJC import LJC
 import ConfigParser
 from datetime import datetime as dt
@@ -78,13 +79,14 @@ class AutoFillInterface():
             cnfgFile = ConfigParser.RawConfigParser()
             cnfgFile.read(self.detectorWiringConfigFile)
             self.LJ = LJC(cnfgFile)
-            self.LJ.controllerInit()
-        except:
+            msg = self.LJ.controllerInit()
+        except LJMError as ljmerror:
             self.EventLog.error(sys.exc_info()[0]) #log the error from the labjack
 #             print 'Interface did not Initalize'
             raise 
         self.loadDetectorConfig() 
         self.getTemperatureLogs()
+        return msg
     
     def initRelease(self):
         '''
@@ -145,6 +147,7 @@ class AutoFillInterface():
         for detector in detectors:
             temps.append(self.detectorValuesDict[detector]['Detector Temperature'])
         self.valuesDictLock.release()
+        #now get the names from the config dict
         self.configDictLock.acquire()
         names = []
         for detector in detectors:
@@ -199,8 +202,8 @@ class AutoFillInterface():
         for detector in self.detectorConfigDict.keys():
             if 'Detector' in detector: #make sure it is a detector not the line chill
                 self.detectors.append(detector)
-                self.detectorValuesDict[detector] = {'Detector Temperature':'0:0','Vent Temperature':'0:0','Valve State':False,\
-                                                     'Fill Started Time':'0:0'}
+                self.detectorValuesDict[detector] = {'Detector Temperature':'N/A','Vent Temperature':'N/A','Valve State':False,\
+                                                     'Fill Started Time':'N/A'}
                 if self.detectorConfigDict[detector]['Fill Enabled'] == 'True':
                     self.enabledDetectors.append(detector)
                 if self.detectorConfigDict[detector]['Temperature Logging'] == 'True':
@@ -264,7 +267,7 @@ class AutoFillInterface():
 #         print 'Thread Started'
 #         threadRepeat = 1\
         
-        error = self.LJ.checkRelayPower()
+        error = self.LJ.Relay()
         if error:
             self.errorList.append(error)
             self.stopRunningEvent.set() #don't let the run start, the relays will not work.
@@ -292,7 +295,7 @@ class AutoFillInterface():
                 # for filling detectrors check for vent temp reaching LN levels
                 self.checkVentTemp()
                 # check for filling timeout, set error and close valve if nessassary 
-                self.checkFillTimeout(>>
+                self.checkFillTimeout()
                 #check for errors with filling or detector temperature
             errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
 #             if errorBody != '':
@@ -396,6 +399,18 @@ class AutoFillInterface():
                         self.EventLog.debug('Miminum Fill Time Experied for %s'%detector)
                     
                 
+    def threadRunningCheck(self):
+        '''
+        Check to see if the thread is running and return status
+        '''    
+        threadRunning = False
+        threads = threading.enumerate()
+        for thread in threads: #join the thread
+            if thread.name == 'MainControlThread':
+                threadRunning = True
+        return threadRunning
+        
+
     def checkVentTemp(self):
         '''
         Check the vent temperatures on filling detectors and see if it has reached liquid nitrogen temperatures
