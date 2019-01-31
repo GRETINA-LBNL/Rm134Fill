@@ -30,3 +30,5 @@ stop - stop the filling operation, open valves are closed
 --
 exit - stop the filling operaiton then close the program
 -- 
+help <size> - print the help file
+    'all' will print the larger help file, leaving this option blank will print the smaller file (this one)
