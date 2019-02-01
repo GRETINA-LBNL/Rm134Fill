@@ -1,6 +1,5 @@
 /LJTestNoUnit.py
 /LJTest.pyc
-/__init__.pyc
-/AutoFillGUI.pyc
-/AutoFillInterface.pyc
-/LJC.pyc
+/*.pyc
+/*.py~
+/*.txt~

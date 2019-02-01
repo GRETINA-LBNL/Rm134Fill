@@ -584,7 +584,8 @@ class AutoFillInterface():
         '''
         returnString = ''
         for setting in self.detectorSettings:
-            returnString += setting + ' | ' + self.detectorConfigDict[detector][setting] + '\n'
+            returnString+=setting+' -> '+bcolors.OKGREEN+self.detectorConfigDict[detector][setting]\
+                            +bcolors.ENDC + '\n'
         
         return returnString
     
@@ -842,6 +843,17 @@ class AutoFillInterface():
             data = cmdFunction(cmdText)
             returnString += ', %s'%data
         return returnString
+
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
     
 #     def getMemoryUsage(self):
 #         '''

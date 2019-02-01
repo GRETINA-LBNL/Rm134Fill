@@ -7,17 +7,22 @@ Entering Detector Settings
 		<option> - detector setting that will be changed
 					Short Hand  - Full Name 
 					enabled 	- Fill Enabled 			> enable/disable nitrogen filling for detector
-					schedule 	- Fill Schedule 		> times at which nitrogen filling will start, not valid for line chill
+					schedule 	- Fill Schedule 		> times at which nitrogen filling will start, 
+                                                            not valid for line chill
 					timeout 	- Fill Timeout 			> total time the nitrogen valve is allowed to be open 
-					minimum 	- Minimum Fill Time		> minimum amount of time the nitrogen valve must be open in minutes, not valid for line chill
-					temp 		- Detector Max Temperature > Temperature above which an error is will be set, errors only set when detector is enabled,
-																not valid for line chill
-					name 		- Detector Name			> name for the detector connected to the detector channel, not valid for line chill 
+					minimum     - Minimum Fill Time		> minimum amount of time the nitrogen valve must be open in
+                                                            minutes, not valid for line chill
+					temp        - Detector Max Temperature > Temperature above which an error is will be set, errors
+                                                                    only set when detector is enabled, not valid for line chill
+					name 		- Detector Name			> name for the detector connected to the detector channel, 
+                                                            not valid for line chill
+                    logging     - Temperature Logging   > enable/disable the logging of the detector temperature
 		<value> - value option will be set to
 					Depends on the setting see below for special cases
 					Short Hand	- Values
 					enabled		- True/False
-					schedule	- 24 hour time in format HH:MM, for multiple fills in one day use a comma to seperate times '12:01,13:45'
+					schedule	- 24 hour time in format HH:MM, for multiple fills in one day 
+                                    use a comma to seperate times '12:01,13:45'
 					timeout		- minutes, intiger 1-60
 					minimum		- minutes, intiger 1-60
 					temp		- degrees K, intiger 1-400
@@ -50,7 +55,8 @@ Display Graph of Recorded Detector Temperature
 
 Display and Clear Errors	
 	error - print the error
-	error clear - clear any errors that are currently active, if error coinditions still exists the specific error will continue to report
+	error clear - clear any errors that are currently active, if error coinditions still exists 
+                    the specific error will continue to report
 
 Enable/Disable Detector Temperature Logging
 	logging <num> <value> - enable or disable temperature logging for specifided detector
@@ -58,7 +64,8 @@ Enable/Disable Detector Temperature Logging
 		<value> - True/False
 		
 Stop Filling Program
-	stop - safely turns off the filling thread, closing valves and turning off all lights. Command line interface will still be running
+	stop - safely turns off the filling thread, closing valves and turning off all lights. 
+            Command line interface will still be running
 	
 Start Filling Program
 	start - starts filling thread
