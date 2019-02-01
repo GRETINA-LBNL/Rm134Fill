@@ -1,5 +1,6 @@
 #Commands for Auto fill system
 get <num> - get current detector settings
+    'all' is a valid number
 --
 set <num> <option> <value> - set detector <num> <option> to <value>
     'write' command needed to write settings entered by set command

@@ -25,6 +25,7 @@ class AutoFillGUI():
         self.cleanDict = {"Name":str,'Fill Timeout':int,'Minimum Fill Time':int,'Detector Max Temperature':int}
         self.shortHand = {'enabled':'Fill Enabled','schedule':'Fill Schedule','timeout':'Fill Timeout','minimum':'Minimum Fill Time',\
                           'temp':'Detector Max Temperature','name':'Name','logging':'Temperature Logging'}
+        self.chillShortHand = {'enabled':'Fill Enabled','timeout':'Chill Timeout'}
         
         self.timeFormat = '%H:%M'
         self.inputSelectDict = {'set':self.detectorSettingsInput,'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,\
@@ -93,57 +94,74 @@ class AutoFillGUI():
         sptext = text.split(' ')
         if sptext[0] == 'chill':
             detector = 'Line Chill'
-        else:
-            detector = 'Detector %s'%sptext[0]
-        try:
-            option = self.shortHand[sptext[1]] #use the shorthand dict to get the correct option to set
-        except KeyError:
-            msg = '%s not a valid option for %s'%(sptext[1],detector)
-            self._printFail(msg)
-            return False
-        if option == 'Fill Schedule':
-            if ',' in sptext[2]:
-                fillTimes = sptext[2].split(',')      
-            else:
-                fillTimes = [sptext[2]]
-            i = 0
-            errorString = ''
-            numTimes = len(fillTimes)
-            for fillTime in fillTimes: #check that the times are valid 24H times
-                try:
-                    dt.strptime(fillTime,self.timeFormat)
-                except ValueError:
-                    if numTimes > 1:
-                        errorString += '%s is not a valid fill time in fill schedule %s\n'%(fillTime,sptext[2])
-                    else:
-                        errorString += '%s is not a valid fill time\n'%(fillTime)
-            if errorString != '':
-                self._printFail(errorString)
-                return False
-            value = sptext[2]   
-        elif option == 'Fill Enabled' or option == 'Temperature Logging': 
-            inputValue = sptext[2].capitalize()            
-            if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
-                value = 'False'
-            elif inputValue == 'True':
-                value = 'True'
-            else:
-                msg = '"%s" not a valid setting for %s'%(sptext[2],option)
+            try: 
+                option = self.chillShortHand[sptext[1]] #use the shorthand dict to get the correct option to set
+            except KeyError:
+                msg = '%s not a valid option for %s'%(sptext[1],detector)
                 self._printFail(msg)
                 return False
-        elif option == 'Name': #the values for names may have spaces in them so join them together
-            values = sptext[2:] #get all the values
-            value = ' '.join(values)
+
+
         else:
+            detector = 'Detector %s'%sptext[0]
             try:
-                value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
-            except:
-                errorString = '"%s" not a valid value for %s setting %s'%(sptext[2],detector,option)
-                self._printFail(errorString)
+                option = self.shortHand[sptext[1]] #use the shorthand dict to get the correct option to set
+            except KeyError:
+                msg = '%s not a valid option for %s'%(sptext[1],detector)
+                self._printFail(msg)
                 return False
-        self.interface.changeDetectorSetting(detector,option,value)
-        self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
-        
+            if option == 'Fill Schedule':
+                value = self._fillScheduleInput(sptext)
+                if value == False:
+                    return value
+            elif option == 'Fill Enabled' or option == 'Temperature Logging': 
+                inputValue = sptext[2].capitalize()            
+                if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
+                    value = 'False'
+                elif inputValue == 'True':
+                    value = 'True'
+                else:
+                    msg = '"%s" not a valid setting for %s'%(sptext[2],option)
+                    self._printFail(msg)
+                    return False
+            elif option == 'Name': #the values for names may have spaces in them so join them together
+                values = sptext[2:] #get all the values
+                value = ' '.join(values)
+            else:
+                try:
+                    value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
+                except:
+                    errorString = '"%s" not a valid value for %s setting %s'%(sptext[2],detector,option)
+                    self._printFail(errorString)
+                    return False
+            self.interface.changeDetectorSetting(detector,option,value)
+            self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
+            
+    def _fillScheduleInput(self,sptext):
+        '''
+        Handle values for the fill schedule input
+        '''    
+        if ',' in sptext[2]:
+            fillTimes = sptext[2].split(',')      
+        else:
+            fillTimes = [sptext[2]]
+        i = 0
+        errorString = ''
+        numTimes = len(fillTimes)
+        for fillTime in fillTimes: #check that the times are valid 24H times
+            try:
+                dt.strptime(fillTime,self.timeFormat)
+            except ValueError:
+                if numTimes > 1:
+                    errorString += '%s is not a valid fill time in fill schedule %s\n'%(fillTime,sptext[2])
+                else:
+                    errorString += '%s is not a valid fill time\n'%(fillTime)
+        if errorString != '':
+            self._printFail(errorString)
+            return False
+        value = sptext[2]   
+        return value
+
     def checkDetectorChanges(self):
         '''
         Show the user what changes they have entered
@@ -175,15 +193,18 @@ class AutoFillGUI():
         full command is 'get 1','all' is also a valid detector number
         '''   
         if text == 'all':
-            detectors = ['1','2','3','4','5','6']
-        elif text in ['1','2','3','4','5','6']:
+            detectors = ['1','2','3','4','5','6','chill']
+        elif text in ['1','2','3','4','5','6','chill']:
             detectors = [text]
         else:
             errorString = '"%s" not a valid detector number'%text
             self._printFail(errorString)
             return False
         for number in detectors:
-            name = 'Detector %s'%number
+            if number == 'chill':
+                name = 'Line Chill'
+            else:
+                name = 'Detector %s'%number
             print '\n'+self.interface.readDetectorConfig(name)
         
     
@@ -271,9 +292,9 @@ class AutoFillGUI():
 #         else:
 #             values = [spText[1]]
 #             detectors = ['Detector %s'%text]
-#         for (detector,value) in zip(detectors,values):
+#        for (detector,value) in zip(detectors,values):
 #             self.interface.setTempLogging(detector,value)
-                         
+                  
                          
     def commandInputs(self,text):
         '''

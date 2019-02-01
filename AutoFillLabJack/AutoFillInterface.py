@@ -510,9 +510,9 @@ class AutoFillInterface():
             if 'Line Chill' == detector:
                 continue
             else:
-                self.detectorValuesDict[detector]['Minimum Fill Timeout'] = '0:0'
+                self.detectorValuesDict[detector]['Minimum Fill Timeout'] = '0'
                 self.detectorValuesDict[detector]['Minimum Fill Experied'] = False
-                self.detectorValuesDict[detector]['Maximum Fill Timeout'] = '0:0'
+                self.detectorValuesDict[detector]['Maximum Fill Timeout'] = '0'
                 self.detectorValuesDict[detector]['Fill Started Time'] = '0:0'
             
     def cleanErrorDict(self):
@@ -582,9 +582,14 @@ class AutoFillInterface():
         Read the detector configuration from the config dict and return a string of the stuff
         :detector: -name of detector to read
         '''
-        returnString = detector+'\n'
-        for setting in self.detectorSettings:
-            returnString+=setting+' -> '+bcolors.OKGREEN+self.detectorConfigDict[detector][setting]\
+        if detector == 'Line Chill':
+            returnString = '\t'+detector+'\n'
+            returnString += '\t'+ 'Enabled-> ' +bcolors.OKGREEN+self.lineChillEnabled+bcolors.ENDC+'\n'\
+                            +'\t'+'Line Chill Timeout-> '+bcolors.OKGREEN+'%d'%self.lineChillTimeout+bcolors.ENDC
+        else:
+            returnString = '\t'+detector+'\n'
+            for setting in self.detectorSettings:
+                returnString+='\t'+setting+' -> '+bcolors.OKGREEN+self.detectorConfigDict[detector][setting]\
                             +bcolors.ENDC + '\n'
         
         return returnString

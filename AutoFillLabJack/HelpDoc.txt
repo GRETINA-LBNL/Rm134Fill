@@ -40,7 +40,7 @@ Load the Detector Configuration file
 	
 Displaying Current Settings
 	get <num> - print the current settings for the entered detector number
-		<num> - Detector number to print current settings, 1-6 or chill 
+		<num> - Detector number to print current settings, 1-6, chill, all 
 		Example	- get 2 -> display all the current settings for detector 2
 
 Display Current Detector Temperatures
