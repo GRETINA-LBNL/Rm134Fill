@@ -149,7 +149,7 @@ class AutoFillGUI():
         Show the user what changes they have entered
         '''
         detectors,settings,values,returnString = self.interface.collectDetectorSettings()
-        print returnString
+        print '\n'+returnString
         settingsDict,enabledDetectors = self.interface.constructSettingsDict(detectors, settings, values)
         errorString = self.interface.checkFillScheduleConflicts(settingsDict,enabledDetectors)
         if errorString:
@@ -172,15 +172,19 @@ class AutoFillGUI():
         '''
         Check the detector settings for the 
         :text: - options for getting detector settings command, '1'
-        full command is 'get 1'
+        full command is 'get 1','all' is also a valid detector number
         '''   
-        if text not in ['1','2','3','4','5','5']:
+        if text == 'all':
+            detectors = ['1','2','3','4','5','6']
+        elif text in ['1','2','3','4','5','6']:
+            detectors = [text]
+        else:
             errorString = '"%s" not a valid detector number'%text
             self._printFail(errorString)
             return False
-        else:
-            name = 'Detector %s'%text
-            print self.interface.readDetectorConfig(name)
+        for number in detectors:
+            name = 'Detector %s'%number
+            print '\n'+self.interface.readDetectorConfig(name)
         
     
     def detectorTempInput(self,text):

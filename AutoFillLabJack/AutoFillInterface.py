@@ -582,7 +582,7 @@ class AutoFillInterface():
         Read the detector configuration from the config dict and return a string of the stuff
         :detector: -name of detector to read
         '''
-        returnString = ''
+        returnString = detector+'\n'
         for setting in self.detectorSettings:
             returnString+=setting+' -> '+bcolors.OKGREEN+self.detectorConfigDict[detector][setting]\
                             +bcolors.ENDC + '\n'
@@ -616,7 +616,8 @@ class AutoFillInterface():
                 detectors.append(detector)
                 settings.append(setting)
                 values.append(value)
-                returnString += '%s %s will be set to: %s \n'%(detector,setting,value)
+                returnString += '%s %s will be set to ->'%(detector,setting)+\
+                                bcolors.OKGREEN+' %s \n'%(value)+bcolors.ENDC
         self.detectorChangesDict = {} #clean the dict so the settings will not be repeated
         return detectors,settings,values,returnString
         
