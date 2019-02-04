@@ -189,11 +189,14 @@ class AutoFillInterface():
         cnfgFile.read(self.detectorConfigFile)
         detectors = cnfgFile.get('Detectors','Names').split(',')
         self.detectorSettings = cnfgFile.get('Detectors','Settings').split(',')
+        self.detectorNumbers = []
         for detector in detectors:
             config = {}
-            for setting in self.detectorSettings:
+            for setting in self.detectorSettings:   
                 config[setting] = cnfgFile.get(detector, setting)
             self.detectorConfigDict[detector] = config
+            number = detector.split(' ')[1]
+            self.detectorNumbers.append(number)
         self.enabledDetectors = []
         self.loggingDetectors = []
         self.detectors = []

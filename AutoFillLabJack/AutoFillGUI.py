@@ -51,13 +51,15 @@ class AutoFillGUI():
         try:
             self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
             msg = self.interface.initController()
+            self.detectorNumbers = self.interface.detectorNumbers
         except:
             msg = 'Interface failed to initalize'
             self._printError(msg)
             raise
-        if msg != None:
+        if msg != '':
             self._printError(msg)
-
+            return False
+        
     def checkThreadRunning(self):
         '''
         Check if the thread that does everything is running and notify the user if the thread is not
@@ -97,17 +99,21 @@ class AutoFillGUI():
             try: 
                 option = self.chillShortHand[sptext[1]] #use the shorthand dict to get the correct option to set
             except KeyError:
-                msg = '%s not a valid option for %s'%(sptext[1],detector)
+                msg = '%s not a valid option for %s'%(sptext,detector)
                 self._printFail(msg)
                 return False
 
 
         else:
-            detector = 'Detector %s'%sptext[0]
+            if sptext[0] not in self.detectorNumbers:
+                msg = '"%s" not a valid detector number'%(sptext[0])
+                self._printFail(msg)
+                return False
+            detector = 'Detector %s'%sptext[0]            
             try:
                 option = self.shortHand[sptext[1]] #use the shorthand dict to get the correct option to set
             except KeyError:
-                msg = '%s not a valid option for %s'%(sptext[1],detector)
+                msg = '"%s" not a valid option for %s'%(sptext[1],detector)
                 self._printFail(msg)
                 return False
             if option == 'Fill Schedule':
@@ -115,15 +121,9 @@ class AutoFillGUI():
                 if value == False:
                     return value
             elif option == 'Fill Enabled' or option == 'Temperature Logging': 
-                inputValue = sptext[2].capitalize()            
-                if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
-                    value = 'False'
-                elif inputValue == 'True':
-                    value = 'True'
-                else:
-                    msg = '"%s" not a valid setting for %s'%(sptext[2],option)
-                    self._printFail(msg)
-                    return False
+                value = self._boolInput(sptext)
+                if value == False:
+                    return value
             elif option == 'Name': #the values for names may have spaces in them so join them together
                 values = sptext[2:] #get all the values
                 value = ' '.join(values)
@@ -160,6 +160,22 @@ class AutoFillGUI():
             self._printFail(errorString)
             return False
         value = sptext[2]   
+        return value
+    
+    def _boolInput(self,sptext):
+        '''
+        Handle the detector options that have True/False value options
+        including Fill Enabled and Temperature Logging
+        '''
+        inputValue = sptext[2].capitalize()            
+        if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
+            value = 'False'
+        elif inputValue == 'True':
+            value = 'True'
+        else:
+            msg = '"%s" not a valid setting for %s'%(sptext[2],option)
+            self._printFail(msg)
+            value = False
         return value
 
     def checkDetectorChanges(self):
@@ -362,7 +378,7 @@ class AutoFillGUI():
         Produce a graph the detector temperature for the given detector number
         '''
 #         detNum = text.split(' ')[1]
-        if text in ['1','2','3','4','5','6']:
+        if text in self.detectorNumbers:
             detName = 'Detector %s'%text
             self.interface.graphDetectorTemp(detName)
         else:

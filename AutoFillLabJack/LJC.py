@@ -300,7 +300,7 @@ class LJC(object):
             return msg #the error will be handled by the Interface
 #             raise LJMError(errorString=msg)
         elif value == True:
-            return None
+            return ''
         
     def _LJWriteSingleState(self,name,state):
         '''
