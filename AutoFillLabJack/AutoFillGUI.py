@@ -10,6 +10,7 @@ from AutoFillLabJack.AutoFillInterface import AutoFillInterface
 from threading import Event
 import logging.config
 import socket
+from labjack.ljm import LJMError
 
 
 class AutoFillGUI():
@@ -48,17 +49,23 @@ class AutoFillGUI():
         '''
         Initalize the interface module
         '''
-        try:
-            self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
-            msg = self.interface.initController()
-            self.detectorNumbers = self.interface.detectorNumbers
-        except:
-            msg = 'Interface failed to initalize'
-            self._printError(msg)
-            raise
-        if msg != '':
-            self._printError(msg)
-            return False
+        i = 0
+        while i<=2:
+            try:
+                self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
+                msg = self.interface.initController()
+                self.detectorNumbers = self.interface.detectorNumbers
+                if msg != '':
+                    self._printWarning(msg)
+                i = 3
+            except LJMError:
+                if i == 2:
+                    msg = 'Interface failed to initalize'
+                    self._printWarning(msg)
+                    raise
+                else:
+                    i+=1
+            
         
     def checkThreadRunning(self):
         '''
@@ -68,7 +75,7 @@ class AutoFillGUI():
         status = self.interface.threadRunningCheck()
         if status == False:
             msg="Operation thread is not running, values read from detector will not be updated"
-            self._printError(msg)       
+            self._printWarning(msg)       
 
     def initRelease(self):
         '''
@@ -100,21 +107,21 @@ class AutoFillGUI():
                 option = self.chillShortHand[sptext[1]] #use the shorthand dict to get the correct option to set
             except KeyError:
                 msg = '%s not a valid option for %s'%(sptext,detector)
-                self._printFail(msg)
+                self._printError(msg)
                 return False
 
 
         else:
             if sptext[0] not in self.detectorNumbers:
                 msg = '"%s" not a valid detector number'%(sptext[0])
-                self._printFail(msg)
+                self._printError(msg)
                 return False
             detector = 'Detector %s'%sptext[0]            
             try:
                 option = self.shortHand[sptext[1]] #use the shorthand dict to get the correct option to set
             except KeyError:
                 msg = '"%s" not a valid option for %s'%(sptext[1],detector)
-                self._printFail(msg)
+                self._printError(msg)
                 return False
             if option == 'Fill Schedule':
                 value = self._fillScheduleInput(sptext)
@@ -132,7 +139,7 @@ class AutoFillGUI():
                     value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
                 except:
                     errorString = '"%s" not a valid value for %s setting %s'%(sptext[2],detector,option)
-                    self._printFail(errorString)
+                    self._printError(errorString)
                     return False
             self.interface.changeDetectorSetting(detector,option,value)
             self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
@@ -157,7 +164,7 @@ class AutoFillGUI():
                 else:
                     errorString += '%s is not a valid fill time\n'%(fillTime)
         if errorString != '':
-            self._printFail(errorString)
+            self._printError(errorString)
             return False
         value = sptext[2]   
         return value
@@ -174,7 +181,7 @@ class AutoFillGUI():
             value = 'True'
         else:
             msg = '"%s" not a valid setting for %s'%(sptext[2],option)
-            self._printFail(msg)
+            self._printError(msg)
             value = False
         return value
 
@@ -189,7 +196,7 @@ class AutoFillGUI():
         if errorString:
             msg1 = '\n   The settings have not be written due to the above error'
             msg2 = '\n   Please amend the fill schedule to fix the conflicts'
-            self._printError(errorString+msg1+msg2)
+            self._printWarning(errorString+msg1+msg2)
             error = True
         else:
             error = False
@@ -214,7 +221,7 @@ class AutoFillGUI():
             detectors = [text]
         else:
             errorString = '"%s" not a valid detector number'%text
-            self._printFail(errorString)
+            self._printError(errorString)
             return False
         for number in detectors:
             if number == 'chill':
@@ -240,7 +247,7 @@ class AutoFillGUI():
                 detectors.append('Detector %s'%num)
         else:
             errorString = '"%s" not a valid detector name'%text
-            self._printFAIL(errorString)
+            self._printError(errorString)
         temps,names = self.interface.getDetectorTemps(detectors)
         displayString = ''
         for (detector,name,temp) in zip(detectors,names,temps):
@@ -274,19 +281,25 @@ class AutoFillGUI():
             self.EventLog.info('Cleaning error log')
         else:
             errorString = self.interface.readDetectorErrors()
-            print errorString
+            self._printError(errorString)
 
-    def _printError(self,errorMsg):
+    def _printWarning(self,warningMsg):
         '''
         Print the error msg in yellow to make sure the operator sees it
         '''
-        print bcolors.WARNING+"Warning: "+errorMsg+bcolors.ENDC
+        print '\t'+bcolors.WARNING+"Warning: "+warningMsg+bcolors.ENDC
     
-    def _printFail(self,failMsg):
+    def _printError(self,errorMsg):
         '''
         Print a fail to the scree, ie red
         '''
-        print bcolors.FAIL+failMsg+bcolors.ENDC
+        print '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
+
+    def _printOK(self,okMsg):
+        '''
+        Print the ok msg to the screen in green
+        '''
+        print '\t'+bcolors.OKGREEN+okMsg+bcolors.ENDC
 
 #     def loggingInput(self,text):
 #         '''
@@ -323,7 +336,7 @@ class AutoFillGUI():
             inputFunction = self.inputSelectDict[command]
         except KeyError:
             msg = '"%s" not a valid command\n enter <help> to print help file' %(command)
-            self._printFail(msg)
+            self._printError(msg)
             return
         commandOptions = ' '.join(sText)
         inputFunction(commandOptions)
@@ -337,8 +350,12 @@ class AutoFillGUI():
         error = self.interface.startRunThread()
         self.EventLog.info('Starting Auto Fill Operation')
         if error != '': #problems in the fill schedule are checked for before a run is started.
-            self.EventLog.info('Starting Stopped, error: %s'%error)
-            print error
+            errorMsg = 'Error: Run thread did not start. %s'%(error)       
+            self.EventLog.info(errorMsg)
+            self._printWarning(errorMsg)
+        else:
+            msg = 'Run thread has started.'
+            self._printOK(msg)
         
     def stopInput(self,text):
         '''

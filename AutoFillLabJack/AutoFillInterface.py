@@ -233,6 +233,7 @@ class AutoFillInterface():
         Start the thread that will run
         '''   
         errorStr = self.checkFillScheduleConflicts(self.detectorConfigDict, self.enabledDetectors)
+        errorStr += self.LJ.checkRelayPower()
         if errorStr != '':
             return errorStr
         else:
@@ -270,15 +271,15 @@ class AutoFillInterface():
 #         print 'Thread Started'
 #         threadRepeat = 1\
         
-        error = self.LJ.Relay()
-        if error:
-            self.errorList.append(error)
-            self.stopRunningEvent.set() #don't let the run start, the relays will not work.
-            self.checkDetectorErrors() #Make sure the error light turns on
-        else:
-            self.stopRunningEvent.clear()
-            self.applyDetectorConfig()
-            self.LJ.heartbeatFlash()
+#        error = self.LJ.checkRelayPower()
+#        if error != '':
+#            self.errorList.append(error)
+#            self.stopRunningEvent.set() #don't let the run start, the relays will not work.
+#            self.checkDetectorErrors() #Make sure the error light turns on
+#        else:
+        self.stopRunningEvent.clear()
+        self.applyDetectorConfig()
+        self.LJ.heartbeatFlash()
         self.errorList = [] #clean the error list for at the beginning of each run
         while self.stopRunningEvent.isSet() == False:
             # read all the detector temps temperatures
@@ -497,7 +498,7 @@ class AutoFillInterface():
             errorString +='No errors have been reported\n'
         else:
             for (error,numRepeat) in self.errorDict.iteritems():
-                msg = '%s has been reported %d times\n'%(error,numRepeat)
+                msg = '%s has been reported %d time(s)\n'%(error,numRepeat)
                 errorString += msg
                 self.EventLog.info(msg)
         return errorString
