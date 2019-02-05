@@ -242,16 +242,17 @@ class AutoFillGUI():
         self.checkThreadRunning()
         if text in detectorNumbers:
             detectors.append('Detector %s'%text)
-        if text == 'All' or text == 'all':
+        elif text == 'All' or text == 'all':
             for num in detectorNumbers:
                 detectors.append('Detector %s'%num)
         else:
-            errorString = '"%s" not a valid detector name'%text
+            errorString = '"%s" not a valid detector number'%text
             self._printError(errorString)
         temps,names = self.interface.getDetectorTemps(detectors)
         displayString = ''
         for (detector,name,temp) in zip(detectors,names,temps):
-            displayString += '%s (%s) temperature %sC\n'%(detector,name,temp)
+            displayString += '\t%s (%s) temperature:'%(detector,name)+\
+                            bcolors.OKGREEN+' %s%sC'%(temp,u"\u00b0")+bcolors.ENDC
         print displayString
     
     def writeSettingsInput(self,text):
@@ -354,16 +355,17 @@ class AutoFillGUI():
             self.EventLog.info(errorMsg)
             self._printWarning(errorMsg)
         else:
-            msg = 'Run thread has started.'
+            msg = 'AutoFill Operation has Started.'
             self._printOK(msg)
         
     def stopInput(self,text):
-        '''
+        '''s
         stop the running thread
-        :text: - not used, needed to make it common
+        :text: - not used, needed to make it common with other input function
         '''
         self.EventLog.info('Stopping Auto Fill Operation')
         self.interface.stopRunThread()
+        self._printOK("AutoFill Operation has Stopped.")
     
     def exitInput(self,text):
         '''

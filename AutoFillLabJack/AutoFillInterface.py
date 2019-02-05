@@ -105,15 +105,15 @@ class AutoFillInterface():
         del self.LJ
     
     
-        
     def readDetectorTemps(self):
         '''
-        :detectors: list of detector names(string) to read temperature
+        Read all of the detector temperatures 
         '''
         with self.valuesDictLock:
             temperatures = self.LJ.readDetectorTemps(self.detectors)
             for (temp,detector) in zip(temperatures,self.detectors):
-                self.detectorValuesDict[detector]['Detector Temperature'] = temp
+                cropTemp = "%.2f"%(float(temp))
+                self.detectorValuesDict[detector]['Detector Temperature'] = cropTemp
 #             self.valuesDictLock.notify() #notify the any threads that are waiting for the
  
     def logDetectorTemps(self):
@@ -125,7 +125,7 @@ class AutoFillInterface():
         with self.valuesDictLock:
             for detector in self.loggingDetectors:
                     temp = self.detectorValuesDict[detector]['Detector Temperature']
-                    self.tempLoggingDict[detector].info('%.3f C'%temp)
+                    self.tempLoggingDict[detector].info('%s C'%temp)
                     
     def getTemperatureLogs(self):
         '''
@@ -366,9 +366,12 @@ class AutoFillInterface():
                     #max fill time
                     
         numValves = len(detectorToOpen)
+#        print "Detector To Open",detectorToOpen
         if self.inihibitFills == True:
             if numValves != 0:
-                msg = 'Fill inhibit prevented %s from starting a fill'%repr(detectorToOpen)
+                detectorName = self.detectorConfigDict[detectorToOpen[0]]["Name"]
+                msg = 'Fill inhibit prevented %s (%s) from starting a fill'%\
+                        (detectorToOpen[0],detectorName)
                 self.errorList.append(msg)                
                 self.EventLog.info(msg)
         else: #if the fills are not inhibited start the filling process
@@ -377,7 +380,7 @@ class AutoFillInterface():
                 self.writeValveState(detectorToOpen,states)
                 for detector in detectorToOpen:
                     self.detectorValuesDict[detector]['Valve State'] = True
-                    print 'Opening valve for detector', detector
+#                    print 'Opening valve for detector', detector
                     self.detectorValuesDict[detector]['Fill Start'] = curTimeStr
                     minFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Minimum Fill Time']))
                     maxFillDelta = td(minutes=int(self.detectorConfigDict[detector]['Fill Timeout']))
@@ -451,8 +454,8 @@ class AutoFillInterface():
 #                 timeoutStr = tim
                 if curTime == self.detectorValuesDict[detector]['Maximum Fill Timeout']:
                     valvesToClose.append(detector)
-                    msg = '%s fill has timed out'%(self.detectorConfigDict[detector]['Name'])
-                    self.errorList.append(msg) 
+#                    msg = '%s fill has timed out'%(self.detectorConfigDict[detector]['Name'])
+#                    self.errorList.append(msg) 
         numValves = len(valvesToClose)
         if numValves != 0:
             print 'Closing valves, timeout',valvesToClose
@@ -498,7 +501,7 @@ class AutoFillInterface():
             errorString +='No errors have been reported\n'
         else:
             for (error,numRepeat) in self.errorDict.iteritems():
-                msg = '%s has been reported %d time(s)\n'%(error,numRepeat)
+                msg = '"%s" has been reported %d time(s)\n'%(error,numRepeat)
                 errorString += msg
                 self.EventLog.info(msg)
         return errorString
