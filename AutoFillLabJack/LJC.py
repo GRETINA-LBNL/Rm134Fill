@@ -40,37 +40,27 @@ class LJC(object):
         '''
         initalize the controller
         '''
-        try:
-            self.controller = ljm.openS('T7', 'USB', '470013817')
-            self.loadWiring()
-            
-#             print ljm.eReadName(self.controller,'SERIAL_NUMBER')
-           
-        except LJMError as ljerror:
-            msg = 'Could not find LabJack %s'%ljerror._errorString
-            self.EventLog.error(msg)
-            raise   
-        ''' 
-        When the controller is initalized it has some trouble connecting so try
-        a couple of time before declaring a problem
-        '''
-        i=0 
-        while i<3:        
+        i = 0
+        msg = ''
+        while i<3:
             try:
-                self.checkRelayPower()
-                i=5
+                self.controller = ljm.openS('T7', 'USB', '470013817')
+                self.loadWiring()
+                msg = self.checkRelayPower()
+                i=4 # If everything worked out break the while loop
             except LJMError as ljerror:
-                msg = "Connection not made: %s"%ljerror._errorString
+                msg = 'Could not find LabJack %s'%ljerror._errorString
+                self.EventLog.error(msg)
+                self.releaseInit()
+                sleep(2)
                 i+=1
-        if i==3:
-            raise LJMError(errorString = msg)
+                sleep(2) #give the controller some time to think about it's life, this
+                #gives makes the reconnect work when tried again.
+            if i==3:
+                raise LJMError(errorString=msg) 
         self.configureTemperatureInputs()
-        msg = self.checkRelayPower()
         return msg
-
-#         serialnumber = ljm.eReadName(self.controller, 'SERIAL_NUMBER')
-#         print 'LabJack Serial Number: %f\n'%(serialnumber)
-        
+ 
     def releaseInit(self):
         '''
         Close the connection to the labjack
@@ -78,6 +68,7 @@ class LJC(object):
 #         print 'release'
         try:
             ljm.close(self.controller)
+            del self.controller
             self.EventLog.info('Releasing LabJack Controller')
         except:
             return
