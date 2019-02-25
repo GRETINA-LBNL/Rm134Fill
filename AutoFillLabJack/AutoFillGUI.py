@@ -23,9 +23,19 @@ class AutoFillGUI():
         '''
         Constructor
         '''
-        self.cleanDict = {"Name":str,'Fill Timeout':int,'Minimum Fill Time':int,'Detector Max Temperature':int}
-        self.shortHand = {'enabled':'Fill Enabled','schedule':'Fill Schedule','timeout':'Fill Timeout','minimum':'Minimum Fill Time',\
-                          'temp':'Detector Max Temperature','name':'Name','logging':'Temperature Logging'}
+        self.cleanDict = {"Name":str,
+                          'Fill Timeout':int,
+                          'Minimum Fill Time':int,
+                          'Detector Max Temperature':int}
+
+        self.shortHand = {'enabled':'Fill Enabled',
+                          'schedule':'Fill Schedule',
+                          'timeout':'Fill Timeout',
+                          'minimum':'Minimum Fill Time',
+                          'temp':'Detector Max Temperature',
+                          'name':'Name',
+                          'logging':'Temperature Logging'}
+
         self.chillShortHand = {'enabled':'Fill Enabled','timeout':'Chill Timeout'}
         
         self.timeFormat = '%H:%M'
@@ -49,22 +59,20 @@ class AutoFillGUI():
         '''
         Initalize the interface module
         '''
-        i = 0
-        while i<=2:
-            try:
-                self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
-                msg = self.interface.initController()
-                self.detectorNumbers = self.interface.detectorNumbers
-                if msg != '':
-                    self._printWarning(msg)
-                i = 3
-            except LJMError:
-                if i == 2:
-                    msg = 'Interface failed to initalize'
-                    self._printWarning(msg)
-                    raise
-                else:
-                    i+=1
+
+        try:
+            self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
+            msg = self.interface.initController()
+            self.detectorNumbers = self.interface.detectorNumbers
+            self.detectorNames = self.interface.detectorNamesDict
+
+            if msg != '':
+                self._printWarning(msg)
+        except LJMError:
+            msg = 'Interface failed to initalize'
+            self._printWarning(msg)
+            raise
+
             
         
     def checkThreadRunning(self):
@@ -101,7 +109,10 @@ class AutoFillGUI():
         
         '''
         sptext = text.split(' ')
-        if sptext[0] == 'chill':
+        detector = self._detectorNameConversion(sptext[0])
+        if detector == False: #if the conversion fails don't do anyting
+            return False
+        if detector == 'chill':
             detector = 'Line Chill'
             try: 
                 option = self.chillShortHand[sptext[1]] #use the shorthand dict to get the correct option to set
@@ -110,13 +121,7 @@ class AutoFillGUI():
                 self._printError(msg)
                 return False
 
-
-        else:
-            if sptext[0] not in self.detectorNumbers:
-                msg = '"%s" not a valid detector number'%(sptext[0])
-                self._printError(msg)
-                return False
-            detector = 'Detector %s'%sptext[0]            
+        else:          
             try:
                 option = self.shortHand[sptext[1]] #use the shorthand dict to get the correct option to set
             except KeyError:
@@ -132,8 +137,12 @@ class AutoFillGUI():
                 if value == False:
                     return value
             elif option == 'Name': #the values for names may have spaces in them so join them together
+                
                 values = sptext[2:] #get all the values
-                value = ' '.join(values)
+                value = ' '.join(values) #Make sure to get all the value the user wrote
+                valid = self._checkValidName(value)
+                if valid == False:
+                    return False
             else:
                 try:
                     value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
@@ -147,6 +156,7 @@ class AutoFillGUI():
     def _fillScheduleInput(self,sptext):
         '''
         Handle values for the fill schedule input
+        :sptext: - text from 'set detector schedule' command 
         '''    
         if ',' in sptext[2]:
             fillTimes = sptext[2].split(',')      
@@ -160,9 +170,9 @@ class AutoFillGUI():
                 dt.strptime(fillTime,self.timeFormat)
             except ValueError:
                 if numTimes > 1:
-                    errorString += '%s is not a valid fill time in fill schedule %s\n'%(fillTime,sptext[2])
+                    errorString += '"%s" is not a valid fill time in fill schedule %s\n'%(fillTime,sptext[2])
                 else:
-                    errorString += '%s is not a valid fill time\n'%(fillTime)
+                    errorString += '"%s" is not a valid fill time\n'%(fillTime)
         if errorString != '':
             self._printError(errorString)
             return False
@@ -173,6 +183,7 @@ class AutoFillGUI():
         '''
         Handle the detector options that have True/False value options
         including Fill Enabled and Temperature Logging
+        :sptext: - text input from commands that have True/False values
         '''
         inputValue = sptext[2].capitalize()            
         if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
@@ -184,6 +195,49 @@ class AutoFillGUI():
             self._printError(msg)
             value = False
         return value
+
+    def _detectorNameConversion(self,nameText):
+        '''
+        Convert the text to the detector name 
+        inputs-
+            :nameText: - text of input name can be number or detector name
+        examples: 
+            1 -> Detector 1
+            <name> -> Detector 1    
+        '''
+        detector = ''
+        if nameText == 'all':
+            detectors = self.detectorNumbers
+        elif nameText in self.detectorNumbers:
+            detectors = nameText
+        else:
+            try:
+                detectors = self.detectorNames[nameText]
+            except KeyError:
+                detectors = ''
+        if detectors == '':
+            msg = '"%s" not a valid detector number or name'%(nameText)
+            self._printError(msg)
+            return False
+        else:
+            return detectors
+    
+    def _checkValidName(self, possibleName):
+        '''
+        check the name does not have any spaces in items
+        :possibleName: - string, name to check if it is valid
+        '''
+        if ' ' in possibleName:
+            msg = "'%s' not a valid name, contains a space"%(possibleName)
+            self._printError(msg)
+            return False
+        try:
+            self.detectorNamesDict[possibleName]
+        except KeyError:
+            msg = "'%s' not a valid name, already exists"%(possibleName)
+            self._printError(msg)
+            return False
+        return True
 
     def checkDetectorChanges(self):
         '''
@@ -205,9 +259,13 @@ class AutoFillGUI():
     def writeDetectorChanges(self,detectors,settings,values):
         '''
         After the user has confirmed the settings are correct write them to the config file
+        :detectors: - list of detector names that will be written
+        :settings: - list of detector settings that will be changed
+        :values: - list of values to set the detector settings to
         '''
         self.checkThreadRunning()
         self.interface.writeDetectorSettings(detectors,settings,values)
+        self.detectorNames = self.interface.detectorNamesDict
         
     def checkDetectorSettingsInput(self,text):
         '''
@@ -215,13 +273,8 @@ class AutoFillGUI():
         :text: - options for getting detector settings command, '1'
         full command is 'get 1','all' is also a valid detector number
         '''   
-        if text == 'all':
-            detectors = ['1','2','3','4','5','6','chill']
-        elif text in ['1','2','3','4','5','6','chill']:
-            detectors = [text]
-        else:
-            errorString = '"%s" not a valid detector number'%text
-            self._printError(errorString)
+        detectors = self._detectorNameConversion(text)
+        if detectors == False:
             return False
         for number in detectors:
             if number == 'chill':
@@ -236,21 +289,15 @@ class AutoFillGUI():
         Display the current temperature for the detector number
         :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
         total command will be 'temp 1'
-        '''
-        detectorNumbers = map(lambda x: str(x),range(1,7))
-        detectors = []   
+        ''' 
         self.checkThreadRunning()
-        if text in detectorNumbers:
-            detectors.append('Detector %s'%text)
-        elif text == 'All' or text == 'all':
-            for num in detectorNumbers:
-                detectors.append('Detector %s'%num)
-        else:
-            errorString = '"%s" not a valid detector number'%text
-            self._printError(errorString)
-        temps,names = self.interface.getDetectorTemps(detectors)
+        detectorNumbers = self._detectorNameConversion(text)
+        if detectorNumber == False:
+            return False
+        
+        temps,names = self.interface.getDetectorTemps(detectorNumbers)
         displayString = ''
-        for (detector,name,temp) in zip(detectors,names,temps):
+        for (detector,name,temp) in zip(detectorNumbers,names,temps):
             displayString += '\t%s (%s) temperature:'%(detector,name)+\
                             bcolors.OKGREEN+' %s%sC'%(temp,u"\u00b0")+bcolors.ENDC
         print displayString
@@ -258,6 +305,7 @@ class AutoFillGUI():
     def writeSettingsInput(self,text):
         '''
         Write the settings that the user entered using the detectorSettingsInput method
+        :text: - not used, needed to make the function match the others
         '''
         detectors,settings,values,errors = self.checkDetectorChanges()
         if errors is True:
@@ -287,18 +335,22 @@ class AutoFillGUI():
     def _printWarning(self,warningMsg):
         '''
         Print the error msg in yellow to make sure the operator sees it
+        :warningMsg: - string that will be printed to the screen in the 
+                        correct color
         '''
         print '\t'+bcolors.WARNING+"Warning: "+warningMsg+bcolors.ENDC
     
     def _printError(self,errorMsg):
         '''
         Print a fail to the scree, ie red
+        :errorMsg: - string that will be printed to the screen in red
         '''
         print '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
 
     def _printOK(self,okMsg):
         '''
         Print the ok msg to the screen in green
+        :okMsg: - string that will be printed to screen in green
         '''
         print '\t'+bcolors.OKGREEN+okMsg+bcolors.ENDC
 
@@ -380,7 +432,7 @@ class AutoFillGUI():
     def helpInput(self,text):
         '''
         Print the help file to screen
-        :text: - 
+        :text: - string, option from user. Either blank or 'all'
         '''
         
         if text == 'all':
@@ -395,14 +447,13 @@ class AutoFillGUI():
     def graphInput(self,text):
         '''
         Produce a graph the detector temperature for the given detector number
+        :text: - string, number of detector to produce graph for
         '''
-#         detNum = text.split(' ')[1]
-        if text in self.detectorNumbers:
-            detName = 'Detector %s'%text
-            self.interface.graphDetectorTemp(detName)
+        detectorNumbers = self._detectorNameConversion(text)
+        if detectorNumbers == False:
+            return False
         else:
-            msg = '"%s" not a valid detector number'%text
-            print msg
+            self.interface.graphDetectorTemp(detectorNumbers)
     
     def mainInput(self):
         '''
@@ -433,6 +484,4 @@ class bcolors:
 if __name__ == '__main__':
     AutoFillGUI = AutoFillGUI()
     AutoFillGUI.mainInput()
-#     AutoFillGUI.startWindow()
-#     AutoFillGUI.addText()
-#     AutoFillGUI.endWindow()
+

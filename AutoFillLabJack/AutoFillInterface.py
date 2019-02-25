@@ -35,7 +35,8 @@ class AutoFillInterface():
         self.errorList = [] #storage of error string recored for each LJ poll
         self.detectorConfigDict = {} #locations for setting for the detector
         self.detectorValuesDict = {} #storage for the detectors current settings
-        self.detectorChangesDict = {}
+        self.detectorChangesDict = {}       
+        self.detectorNamesDict = {} #Dict for connecting detector name and number, used in the GUI
         self.tempLoggingDict = {}
         self.EventLog = eventLog
 #         hostname = socket.gethostname()
@@ -140,6 +141,7 @@ class AutoFillInterface():
         
     def getDetectorTemps(self,detectors):
         '''
+        Gather the detector temps using the list of detectors given
         :detectors: list of detector names(string) to read temperature
         '''
         self.valuesDictLock.acquire()
@@ -211,6 +213,8 @@ class AutoFillInterface():
                     self.enabledDetectors.append(detector)
                 if self.detectorConfigDict[detector]['Temperature Logging'] == 'True':
                     self.loggingDetectors.append(detector)
+                self.detectorNamesDict[self.detectorConfigDict[detector]["Name"]] = detector.split(' ')[1]
+                #Just get the detector number, 'Detector' will be added inthe GUI
         lineChillEnabled = cnfgFile.get('Line Chill','Fill Enabled')
         if lineChillEnabled == 'True' or lineChillEnabled == 'False':
             self.lineChillEnabled = lineChillEnabled
@@ -246,6 +250,7 @@ class AutoFillInterface():
         '''
         Stop the MainControlThread 
         This will do the same thing as initRelease
+        :EXIT: - bool, option for for turning everything off or just stopping the thread
         '''   
         self.stopRunningEvent.set()
         threads = threading.enumerate()
@@ -268,15 +273,7 @@ class AutoFillInterface():
         '''
         Thread run the detector filling
         '''
-#         print 'Thread Started'
-#         threadRepeat = 1\
-        
-#        error = self.LJ.checkRelayPower()
-#        if error != '':
-#            self.errorList.append(error)
-#            self.stopRunningEvent.set() #don't let the run start, the relays will not work.
-#            self.checkDetectorErrors() #Make sure the error light turns on
-#        else:
+
         self.stopRunningEvent.clear()
         self.applyDetectorConfig()
         self.LJ.heartbeatFlash()
@@ -334,7 +331,7 @@ class AutoFillInterface():
             curTemp = float(self.detectorValuesDict[detector]['Detector Temperature'])
             if curTemp > maxTemp:
                 name = self.detectorConfigDict[detector]['Name']
-                msg = '%s (%s) temperature has exceeded its max allowed temperature'%(name,detector)
+                msg = '%s (%s) temperature has exceeded its max allowed temperature'%(detector,name)
                 self.errorList.append(msg)
                 self.EventLog.info(msg)
                
@@ -527,6 +524,7 @@ class AutoFillInterface():
         Clean the error dict, only user input will run this method
         '''    
         self.errorDict = {}
+        self.errorList = []
         self.LJ.writeErrorState(False)
         return True
     
@@ -603,7 +601,11 @@ class AutoFillInterface():
     
     def changeDetectorSetting(self,detector,setting,value):
         '''
-        Collect the settings that will be made to the detector settings. This will not write to the config file or change any settings
+        Collect the settings that will be made to the detector settings. This will not write to the config file or change any settings  
+        :detector: - string, detector name 
+        :setting: - string, name of setting that will be changed
+        :value: - string, value of setting to be written
+    
         '''  
         try:
             self.detectorChangesDict[detector]['Settings'].append(setting)
@@ -675,6 +677,9 @@ class AutoFillInterface():
         fill at a time. Each detector will have exclusive control over the fill valve starting at the scheduled start time
         and extending to the Fill Timeout. Other detector can not be scheduled for filling during this time. 
         This check is only done for detectors that are enabled or will become enabled.
+        
+        :settingsDict: - dict of current detector settingsDict
+        :enabledDetectors: - list of detector names that will be/are enabled
         '''
         
         
