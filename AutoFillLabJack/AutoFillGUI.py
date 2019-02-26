@@ -7,6 +7,7 @@ Created on Sep 16, 2016
 # import time
 from datetime import datetime as dt
 from AutoFillLabJack.AutoFillInterface import AutoFillInterface
+from time import sleep
 from threading import Event
 import logging.config
 import socket
@@ -54,26 +55,34 @@ class AutoFillGUI():
         self.getLogs()
         self.exitEvent = Event()
         
-        
     def initInterface(self):
         '''
         Initalize the interface module
         '''
-
-        try:
-            self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
-            msg = self.interface.initController()
-            self.detectorNumbers = self.interface.detectorNumbers
-            self.detectorNamesDict = self.interface.detectorNamesDict
-
-            if msg != '':
+        i=0
+        while i<3:
+            try:
+                msgStatus = "Try #%d to initalize Controller"%i
+                self._printOKGreen(msgStatus)
+                self.interface = AutoFillInterface(eventLog=self.EventLog,hostname=self.hostname)
+                msg = self.interface.initController()
+                self.detectorNumbers = self.interface.detectorNumbers
+                self.detectorNamesDict = self.interface.detectorNamesDict
+                i=4
+                msgStatus = "Controller initalization successfull"
+                self._printOKGreen(msgStatus)
+                if msg != '':
+                    self._printWarning(msg)
+            except LJMError:
+                msg = 'Interface failed to initalize'
+                self.interface.initRelease()
+                del self.interface
                 self._printWarning(msg)
-        except LJMError:
-            msg = 'Interface failed to initalize'
-            self._printWarning(msg)
-            raise
-
-            
+                i+=1
+                if i == 3:
+                    raise
+            if i <= 2:    
+                sleep(3)
         
     def checkThreadRunning(self):
         '''
@@ -231,6 +240,7 @@ class AutoFillGUI():
             self._printError(msg)
             return False
         try:
+            print self.detectorNamesDict
             self.detectorNamesDict[possibleName]
             msg = "'%s' not a valid name, already exists"%(possibleName)
             self._printError(msg)
@@ -264,7 +274,6 @@ class AutoFillGUI():
         self.checkThreadRunning()
         self.interface.writeDetectorSettings(detectors,settings,values)
         self.detectorNamesDict = self.interface.detectorNamesDict
-        self.detectorNumbers = self.interface.detectorNumbers
         
     def checkDetectorSettingsInput(self,text):
         '''
@@ -347,12 +356,19 @@ class AutoFillGUI():
         '''
         print '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
 
-    def _printOK(self,okMsg):
+    def _printOKGreen(self,okMsg):
         '''
         Print the ok msg to the screen in green
         :okMsg: - string that will be printed to screen in green
         '''
         print '\t'+bcolors.OKGREEN+okMsg+bcolors.ENDC
+    
+    def _printOKBlue(self,okMsg):
+        '''
+        Print the ok msg to the screen in blue
+        :okMsg: - string that will be printed to screen in green
+        '''
+        print '\t'+bcolors.OKBLUE+okMsg+bcolors.ENDC
 
 #     def loggingInput(self,text):
 #         '''
@@ -408,7 +424,7 @@ class AutoFillGUI():
             self._printWarning(errorMsg)
         else:
             msg = 'AutoFill Operation has Started.'
-            self._printOK(msg)
+            self._printOKGreen(msg)
         
     def stopInput(self,text):
         '''s
@@ -417,7 +433,7 @@ class AutoFillGUI():
         '''
         self.EventLog.info('Stopping Auto Fill Operation')
         self.interface.stopRunThread()
-        self._printOK("AutoFill Operation has Stopped.")
+        self._printOKGreen("AutoFill Operation has Stopped.")
     
     def exitInput(self,text):
         '''

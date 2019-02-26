@@ -94,16 +94,21 @@ class AutoFillInterface():
         Clean enerything up before closing
         turn off all the leds and valves
         '''  
-        self.stopRunThread(EXIT=True)
-        self.initReleaseEvent.set()
-        threads = threading.enumerate()
-        for thread in threads: #Stop the thread that runs the communication socket
-            if thread.name == 'SocketThread':
-                thread.join()
+        try:
+            self.stopRunThread(EXIT=True)
+            self.initReleaseEvent.set()
+            threads = threading.enumerate()
+            for thread in threads: #Stop the thread that runs the communication socket
+                if thread.name == 'SocketThread':
+                    thread.join()
 
-        self.LJ.releaseInitFlash()
-        self.LJ.releaseInit()
+            self.LJ.releaseInitFlash()
+            self.LJ.releaseInit()
+            msg = "Proper LJ Shutdown Succeeded"
+        except:
+            msg = "Proper LJ Shutdown Failed, Deleted Instead."
         del self.LJ
+        return msg
     
     
     def readDetectorTemps(self):
@@ -192,6 +197,7 @@ class AutoFillInterface():
         detectors = cnfgFile.get('Detectors','Names').split(',')
         self.detectorSettings = cnfgFile.get('Detectors','Settings').split(',')
         self.detectorNumbers = []
+        self.detectorNamesDict = {}
         for detector in detectors:
             config = {}
             for setting in self.detectorSettings:   
@@ -309,7 +315,6 @@ class AutoFillInterface():
                 if self.stopRunningEvent.isSet() == True:
                     break
                 if self.loadConfigEvent.is_set(): # check if the config file has been changed and reload it if nessary
-                    self.loadDetectorConfig()
                     self.applyDetectorConfig()
                     self.loadConfigEvent.clear()
                 self.checkFillInhibit()
@@ -506,10 +511,11 @@ class AutoFillInterface():
     def cleanValuesDict(self,detectors):
         '''
         Reset self.detectorValuesDict after a fill has been completed
-        this will reset 'Minimum Fill Timout', 'Minimum Fill Experied', 'Maximum Fill Timout','Fill Started Time'
+        this will reset 'Minimum Fill Timeout', 'Minimum Fill Experied', 'Maximum Fill Timout','Fill Started Time'
         :detectors: - list of detectors to clean up
         
         '''
+    
         for detector in detectors:
             if 'Line Chill' == detector:
                 continue
@@ -648,9 +654,11 @@ class AutoFillInterface():
             cnfgFile.set(section, option, value)
         with open(self.detectorConfigFile, 'w') as FILE:
             cnfgFile.write(FILE)
-        self.loadConfigEvent.set() #set the event that will cause the 
-        self.cleanValuesDict(sections)
-        self.loadDetectorConfig()
+        with self.valuesDictLock and self.configDictLock:
+            self.cleanValuesDict(sections)
+            self.loadDetectorConfig()
+            
+        self.loadConfigEvent.set()
         
     def constructSettingsDict(self,sections,options,values):
         '''

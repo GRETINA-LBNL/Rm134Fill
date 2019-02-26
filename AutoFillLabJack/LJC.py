@@ -42,22 +42,11 @@ class LJC(object):
         '''
         i = 0
         msg = ''
-        while i<3:
-            try:
-                self.controller = ljm.openS('T7', 'USB', '470013817')
-                self.loadWiring()
-                msg = self.checkRelayPower()
-                i=4 # If everything worked out break the while loop
-            except LJMError as ljerror:
-                msg = 'Could not find LabJack %s'%ljerror._errorString
-                self.EventLog.error(msg)
-                self.releaseInit()
-                sleep(2)
-                i+=1
-                sleep(2) #give the controller some time to think about it's life, this
-                #gives makes the reconnect work when tried again.
-            if i==3:
-                raise LJMError(errorString=msg) 
+       
+        self.controller = ljm.openS('T7', 'USB', '470013817')
+        self.loadWiring()
+        msg = self.checkRelayPower()
+        i=4 # If everything worked out break the while loop
         self.configureTemperatureInputs()
         return msg
  
