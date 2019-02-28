@@ -784,7 +784,29 @@ class AutoFillInterface():
                                 continue
         return conflictString
                         
-        
+    def checkMinFillMaxFillConflicts(self,detectorSettingsDict):
+        '''
+        Check the min fill time is less than the max fill time
+        :detectorSettingsDict: -- settings dict that will be checked for conflicts
+        '''    
+        detectors = []
+        timeouts = []
+        for detector in detectorSettingsDict.iterkeys():
+            detectors.append(detector)
+            minimumFill = detectorSettingsDict[detector]['Minimum Fill Time']
+            maximumFill = detectorSettingsDict[detector]['Fill Timeout']
+            timeouts.append((minimumFill,maximumFill))
+        msgStr = ''    
+        for (detector,timeout) in zip(detectors,timeouts):
+            (minFill,maxFill) = timeout
+            if minFill >= maxFill:
+                detectorName = detectorSettingsDict[detector]["Name"]
+                msg = "%s(%s) has invalid fill timeouts, minimum fill (%s) >= to max fill (%s)"%\
+                        (detectorName,detector,minFill,maxFill)
+                msgStr += msg + '\n'
+        return msgStr
+
+
     def graphDetectorTemp(self,detName):
         '''
         Make a plot of the recorded temperatures for the give detector number

@@ -253,8 +253,11 @@ class AutoFillGUI():
         '''
         detectors,settings,values,returnString = self.interface.collectDetectorSettings()
         print '\n'+returnString
+        errorList = []
         settingsDict,enabledDetectors = self.interface.constructSettingsDict(detectors, settings, values)
-        errorString = self.interface.checkFillScheduleConflicts(settingsDict,enabledDetectors)
+        errorList.append(self.interface.checkFillScheduleConflicts(settingsDict,enabledDetectors))
+        errorList.append(self.interface.checkMinFillMaxFillConflicts(settingsDict))
+        errorString = '\n'.join(errorList)
         if errorString:
             msg1 = '\n   The settings have not be written due to the above error'
             msg2 = '\n   Please amend the fill schedule to fix the conflicts'
@@ -419,7 +422,7 @@ class AutoFillGUI():
         error = self.interface.startRunThread()
         self.EventLog.info('Starting Auto Fill Operation')
         if error != '': #problems in the fill schedule are checked for before a run is started.
-            errorMsg = 'Error: Run thread did not start. %s'%(error)       
+            errorMsg = 'Run thread did not start. %s'%(error)       
             self.EventLog.info(errorMsg)
             self._printWarning(errorMsg)
         else:
