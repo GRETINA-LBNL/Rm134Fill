@@ -9,7 +9,7 @@ Entering Dector Settings to Change
 					enabled 	- Fill Enabled 			> enable/disable nitrogen filling for detector
 					schedule 	- Fill Schedule 		> times at which nitrogen filling will start, 
                                                             not valid for line chill
-					timeout 	- Fill Timeout 			> total time the nitrogen valve is allowed to be open 
+					maximum 	- Maximun Fill Time 			> total time the nitrogen valve is allowed to be open 
 					minimum     - Minimum Fill Time		> minimum amount of time the nitrogen valve must be open in
                                                             minutes, not valid for line chill
 					temp        - Detector Max Temperature > Temperature above which an error is will be set, errors
@@ -24,12 +24,12 @@ Entering Dector Settings to Change
 					enabled		- True/False
 					schedule	- 24 hour time in format HH:MM, for multiple fills in one day 
                                     use a comma to seperate times '12:01,13:45'
-					timeout		- minutes, intiger 1-60
+					maximum		- minutes, intiger 1-60
 					minimum		- minutes, intiger 1-60
 					temp		- degrees K, intiger 1-400
 					name		- string, no spaces
 		Example - set 1 enabled True -> Enables automatic filling of detector 1
-				- set 3 timeout 4 -> sets detector 3 fill timeout to 4 minutes
+				- set 3 timeout 4 -> sets detector 3 Maximun Fill Time to 4 minutes
 				- set 6 schedule 7:50,9:13,22:44 -> set the filling schedule for 
                                                     detector 6 to 7:50am 9:13am and 10:44pm
 							

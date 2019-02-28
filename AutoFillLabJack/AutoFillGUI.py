@@ -25,13 +25,13 @@ class AutoFillGUI():
         Constructor
         '''
         self.cleanDict = {"Name":str,
-                          'Fill Timeout':int,
+                          'Maximun Fill Time':int,
                           'Minimum Fill Time':int,
                           'Detector Max Temperature':int}
 
         self.shortHand = {'enabled':'Fill Enabled',
                           'schedule':'Fill Schedule',
-                          'timeout':'Fill Timeout',
+                          'maximum':'Maximun Fill Time',
                           'minimum':'Minimum Fill Time',
                           'temp':'Detector Max Temperature',
                           'name':'Name',

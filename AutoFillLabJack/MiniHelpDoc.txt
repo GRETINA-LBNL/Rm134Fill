@@ -7,7 +7,7 @@ set <num/name> <option> <value> - set detector <num> <option> to <value>
     <options>
     enabled		- True/False
     schedule	- 24 hour time (HH:MM), comma sperates fill times '12:01,13:45'
-    timeout		- minutes, intiger 1-60
+    maximum		- minutes, intiger 1-60
     minimum		- minutes, intiger 1-60
     temp		- degrees K, intiger 1-400
     logging     - True/False
