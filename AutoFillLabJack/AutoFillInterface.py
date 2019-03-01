@@ -85,9 +85,12 @@ class AutoFillInterface():
             self.EventLog.error(sys.exc_info()[0]) #log the error from the labjack
 #             print 'Interface did not Initalize'
             raise 
-        self.loadDetectorConfig() 
+        msgLst = self.loadDetectorConfig() 
+        if msg != '':
+            msgLst.append(msg)
         self.getTemperatureLogs()
-        return msg
+       
+        return msgLst
     
     def initRelease(self):
         '''
@@ -225,6 +228,8 @@ class AutoFillInterface():
         if lineChillEnabled == 'True' or lineChillEnabled == 'False':
             self.lineChillEnabled = lineChillEnabled
         self.lineChillTimeout = float(cnfgFile.get('Line Chill','Maximun Fill Time'))
+        errorMsgLst = self.checkValidConfiguration(self.detectorConfigDict,self.enabledDetectors)
+        return errorMsgLst
        
     def applyDetectorConfig(self):
         '''
@@ -681,9 +686,10 @@ class AutoFillInterface():
     
     def checkFillScheduleConflicts(self,settingsDict,enabledDetectors):
         '''
-        Check the fill schedule for conflicts between other detector fill schedules, only one detector will be allowed to 
-        fill at a time. Each detector will have exclusive control over the fill valve starting at the scheduled start time
-        and extending to the Maximun Fill Time. Other detector can not be scheduled for filling during this time. 
+            Check the fill schedule for conflicts between other detector fill schedules, 
+        only one detector will be allowed to fill at a time. Each detector will have exclusive
+        control over the fill valve starting at the scheduled start time and extending to the
+        Maximun Fill Time. Other detector can not be scheduled for filling during this time. 
         This check is only done for detectors that are enabled or will become enabled.
         
         :settingsDict: - dict of current detector settingsDict
@@ -702,16 +708,12 @@ class AutoFillInterface():
                 startTimes.append(times)
                 timeout = self.detectorConfigDict[detector]['Maximun Fill Time']
                 timeOuts.append(td(minutes=int(timeout)))
-            errorStr = self._checkFillOverlap(enabledDetectors, startTimes, timeOuts)
-            errorStr += self._checkFillConflicts(enabledDetectors, startTimes, timeOuts)
-            if errorStr != '':
-                return errorStr
-            else:
-                return ''
-#             return startTimes,timeOuts
-
+            errorList = []
+            errorList += self._checkFillOverlap(enabledDetectors, startTimes, timeOuts)
+            errorList += self._checkFillConflicts(enabledDetectors, startTimes, timeOuts)
+            return errorList
         else:
-            return ''
+            return []
         
         #make a fill start and end time, check that other fill start times do not fall between start and end time
     
@@ -724,9 +726,9 @@ class AutoFillInterface():
         :schedules: - nested list of schedules for each detector, should be each entry should be a datetime object
         :timeouts: - list of timout values for each detector, items should be timedelta objects
         '''  
-        overlapString = ''
+        overlapList = []
         if len(detectors) < 1:
-            return overlapString
+            return overlapList
         for (detector,schedule,timeout) in zip(detectors,schedules,timeouts):
             numFills = len(schedule)
             if numFills <=1:
@@ -739,11 +741,12 @@ class AutoFillInterface():
                         Sch1 = dt.strftime(SCHStrt,self.timeFormat)
                         Sch2 = dt.strftime(schedule[i],self.timeFormat)
                         Tout = str(timeout).split(':')[1]
-                        overlapString += '%s has Schedule Overlap: %s and %s with timeout: %s min \n'%(detector,Sch1,Sch2,Tout)
+                        msg = '%s has Schedule Overlap: %s and %s with timeout: %s min'%(detector,Sch1,Sch2,Tout)
+                        overlapString.append(msg)
                         
                     else:
                         continue
-        return overlapString
+        return overlapList
         
     def _checkFillConflicts(self,detectors,schedules,timeouts):
         '''
@@ -754,10 +757,10 @@ class AutoFillInterface():
         :schedules: - nested list of fill schedules for each detector, items should be datetime objects
         :timeouts: - list of timeout values for the given detector, items should be timedelta objects
         '''
-        conflictString = ''
+        conflictList = []
         numDetectors = len(detectors)
         if numDetectors <=1:
-            return conflictString
+            return conflictList
         for i in range(numDetectors): #interate through all the detectors that will be checked
             detector_i = detectors[i] #set the values that will be checked against all the other detectors, 'master' detector
             schedule_i = schedules[i] #all detectors need to be master detectors
@@ -777,12 +780,12 @@ class AutoFillInterface():
                                 strtime_h = dt.strftime(start_h,self.timeFormat)
                                 strtimeout_i = str(timeout_i).split(':')[1]
 #                                 strtimeout_h = str(timeout_h).split(':')[1]
-                                conStr = '%s fill at %s (timeout %s min) conflicts with %s fill at %s \n'%\
+                                conStr = '%s fill at %s (timeout %s min) conflicts with %s fill at %s'%\
                                         (detector_i,strTime_i,strtimeout_i,detector_h,strtime_h)
-                                conflictString += conStr
+                                conflictList.append(conStr)
                             else:
                                 continue
-        return conflictString
+        return conflictList
                         
     def checkMinFillMaxFillConflicts(self,detectorSettingsDict):
         '''
@@ -796,16 +799,33 @@ class AutoFillInterface():
             minimumFill = detectorSettingsDict[detector]['Minimum Fill Time']
             maximumFill = detectorSettingsDict[detector]['Maximun Fill Time']
             timeouts.append((minimumFill,maximumFill))
-        msgStr = ''    
+        msgLst=[]
         for (detector,timeout) in zip(detectors,timeouts):
             (minFill,maxFill) = timeout
-            if minFill >= maxFill:
+            intMinFill = int(minFill)
+            intMaxFill = int(maxFill)
+            if intMinFill >= intMaxFill:
                 detectorName = detectorSettingsDict[detector]["Name"]
-                msg = "%s (%s) has invalid Maximun Fill Times, minimum fill (%s) >= to max fill (%s)"%\
+                msg = "%s (%s) has invalid Maximun/Maximum Fill Time, Minimum Fill (%s) >= Max Fill (%s)"%\
                         (detectorName,detector,minFill,maxFill)
-                msgStr += msg + '\n'
-        return msgStr
+                msgLst.append(msg)
+        return msgLst
 
+    def checkValidConfiguration(self,detectorSettingsDict,enabledDetectors):
+        '''
+        Check that the Detector Configuration is valid
+        :detectorSettingsDict: -- dictionary containing detector configurations
+        :enabledDetectors: -- list of detectors that are currently enabled
+        '''
+        errorLst = []
+        errorLst += self.checkFillScheduleConflicts(self.detectorConfigDict,self.enabledDetectors)
+        errorLst += self.checkMinFillMaxFillConflicts(self.detectorConfigDict)
+        errors = []
+        for error in errorLst:
+            if error != '':
+                errors.append(error)
+        errorStr = '\n'.join(errors)
+        return errorStr
 
     def graphDetectorTemp(self,detName):
         '''

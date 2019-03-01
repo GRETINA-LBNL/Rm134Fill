@@ -40,9 +40,17 @@ class AutoFillGUI():
         self.chillShortHand = {'enabled':'Fill Enabled','timeout':'Chill Timeout'}
         
         self.timeFormat = '%H:%M'
-        self.inputSelectDict = {'set':self.detectorSettingsInput,'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,\
-                               'error':self.errorInput,'start':self.startInput,'stop':self.stopInput,'exit':self.exitInput,\
-                                'write':self.writeSettingsInput,'graph':self.graphInput,'help':self.helpInput}
+        self.inputSelectDict ={'set':self.detectorSettingsInput,
+                               'get':self.checkDetectorSettingsInput,
+                               'temp':self.detectorTempInput,
+                               'error':self.errorInput,
+                               'start':self.startInput,
+                               'stop':self.stopInput,
+                               'exit':self.exitInput,
+                               'write':self.writeSettingsInput,
+                               'load':self.loadInput,
+                               'graph':self.graphInput,
+                               'help':self.helpInput}
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
@@ -255,8 +263,7 @@ class AutoFillGUI():
         print '\n'+returnString
         errorList = []
         settingsDict,enabledDetectors = self.interface.constructSettingsDict(detectors, settings, values)
-        errorList.append(self.interface.checkFillScheduleConflicts(settingsDict,enabledDetectors))
-        errorList.append(self.interface.checkMinFillMaxFillConflicts(settingsDict))
+        errorList = self.interface.checkValidConfiguration()
         errorString = '\n'.join(errorList)
         if errorString:
             msg1 = '\n   The settings have not be written due to the above error'
@@ -473,7 +480,16 @@ class AutoFillGUI():
             return False
         else:
             self.interface.graphDetectorTemp(detectorNumbers)
-    
+
+    def loadInput(self,text):
+        '''
+        load the changes made to the configuration file
+        :text: -not used
+        '''
+        msgStr = self.interface.loadDetectorConfig()
+        if msgStr != []:
+            self._printWarning(msgStr)
+            
     def mainInput(self):
         '''
         Main input for the user, feeds input to commandInputs() for completing tasks
