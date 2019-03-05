@@ -61,6 +61,7 @@ class AutoFillInterface():
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
+        self.mainThreadName = 'MainControlThread'
         self.valuesDictLock = threading.Lock()
         self.configDictLock = threading.Lock()
 #         self.infoGatherLock = threading.Lock()
@@ -249,10 +250,14 @@ class AutoFillInterface():
         '''   
         errorStr = self.checkValidConfiguration(self.detectorConfigDict,self.enabledDetectors)
         errorStr += self.LJ.checkRelayPower()
+        runningThreads = threading.enumerate()
+        for thread in runningThreads:
+            if thread.name == self.mainThreadName:
+                errorStr+='Thread already running.'
         if errorStr != '':
             return errorStr
         else:
-            mainThread = threading.Thread(target=self.runThread,name='MainControlThread',args=())
+            mainThread = threading.Thread(target=self.runThread,name=self.mainThreadName,args=())
             mainThread.start()
             return ''
 #         print 'end of run start'
@@ -266,7 +271,7 @@ class AutoFillInterface():
         self.stopRunningEvent.set()
         threads = threading.enumerate()
         for thread in threads: #join the thread
-            if thread.name == 'MainControlThread':
+            if thread.name == self.mainThreadName:
                 thread.join()
                 
         states = [False] * len(self.detectors)

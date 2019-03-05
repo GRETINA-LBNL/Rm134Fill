@@ -207,7 +207,7 @@ class AutoFillGUI():
         elif inputValue == 'True':
             value = 'True'
         else:
-            msg = '"%s" not a valid setting for %s'%(sptext[2],option)
+            msg = '"%s" not a valid setting for %s'%(sptext[2],sptext[1])
             self._printError(msg)
             value = False
         return value
