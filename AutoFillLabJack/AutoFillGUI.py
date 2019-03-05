@@ -158,6 +158,7 @@ class AutoFillGUI():
                 valid = self._checkValidName(value)
                 if valid == False:
                     return False
+                    
             else:
                 try:
                     value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
@@ -248,10 +249,10 @@ class AutoFillGUI():
             self._printError(msg)
             return False
         try:
-            print self.detectorNamesDict
             self.detectorNamesDict[possibleName]
-            msg = "'%s' not a valid name, already exists"%(possibleName)
+            msg = "'%s' not a valid name, name is currently being used."%(possibleName)
             self._printError(msg)
+            return False
         except KeyError:
             return True
 
