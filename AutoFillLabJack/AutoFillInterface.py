@@ -87,7 +87,7 @@ class AutoFillInterface():
             raise 
         msgLst = self.loadDetectorConfig() 
         if msg != '':
-            msgLst.append(msg)
+            msgLst += '\n\t'+msg
         self.getTemperatureLogs()
        
         return msgLst
@@ -247,7 +247,7 @@ class AutoFillInterface():
         '''
         Start the thread that will run
         '''   
-        errorStr = self.checkFillScheduleConflicts(self.detectorConfigDict, self.enabledDetectors)
+        errorStr = self.checkValidConfiguration(self.detectorConfigDict,self.enabledDetectors)
         errorStr += self.LJ.checkRelayPower()
         if errorStr != '':
             return errorStr
@@ -818,13 +818,13 @@ class AutoFillInterface():
         :enabledDetectors: -- list of detectors that are currently enabled
         '''
         errorLst = []
-        errorLst += self.checkFillScheduleConflicts(self.detectorConfigDict,self.enabledDetectors)
-        errorLst += self.checkMinFillMaxFillConflicts(self.detectorConfigDict)
+        errorLst += self.checkFillScheduleConflicts(detectorSettingsDict,enabledDetectors)
+        errorLst += self.checkMinFillMaxFillConflicts(detectorSettingsDict)
         errors = []
         for error in errorLst:
             if error != '':
                 errors.append(error)
-        errorStr = '\n'.join(errors)
+        errorStr = '\n\t'.join(errors)
         return errorStr
 
     def graphDetectorTemp(self,detName):

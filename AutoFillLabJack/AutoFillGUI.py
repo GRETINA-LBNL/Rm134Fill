@@ -77,12 +77,12 @@ class AutoFillGUI():
                 self.detectorNumbers = self.interface.detectorNumbers
                 self.detectorNamesDict = self.interface.detectorNamesDict
                 i=4
-                msgStatus = "Controller initalization successfull"
+                msgStatus = "Controller Initalization Successfull"
                 self._printOKGreen(msgStatus)
                 if msg != '':
                     self._printWarning(msg)
             except LJMError:
-                msg = 'Interface failed to initalize'
+                msg = 'Interface Failed to Initalize'
                 self.interface.initRelease()
                 del self.interface
                 self._printWarning(msg)
@@ -263,16 +263,11 @@ class AutoFillGUI():
         print '\n'+returnString
         errorList = []
         settingsDict,enabledDetectors = self.interface.constructSettingsDict(detectors, settings, values)
-        errorList = self.interface.checkValidConfiguration()
-        errorString = '\n'.join(errorList)
+        errorString = self.interface.checkValidConfiguration(settingsDict,enabledDetectors)
         if errorString:
-            msg1 = '\n   The settings have not be written due to the above error'
-            msg2 = '\n   Please amend the fill schedule to fix the conflicts'
-            self._printWarning(errorString+msg1+msg2)
-            error = True
-        else:
-            error = False
-        return detectors,settings,values,error
+            msg = '\n\tPlease amend the fill schedule to fix the conflicts.'
+            self._printWarning(errorString+msg)
+        return detectors,settings,values
     
     def writeDetectorChanges(self,detectors,settings,values):
         '''
@@ -326,9 +321,7 @@ class AutoFillGUI():
         Write the settings that the user entered using the detectorSettingsInput method
         :text: - not used, needed to make the function match the others
         '''
-        detectors,settings,values,errors = self.checkDetectorChanges()
-        if errors is True:
-            return
+        detectors,settings,values = self.checkDetectorChanges()
 #         print 'Detectors',detectors
 #         print 'Settings', settings
 #         print 'Values', values
@@ -429,7 +422,7 @@ class AutoFillGUI():
         error = self.interface.startRunThread()
         self.EventLog.info('Starting Auto Fill Operation')
         if error != '': #problems in the fill schedule are checked for before a run is started.
-            errorMsg = 'Run thread did not start. %s'%(error)       
+            errorMsg = 'Run thread did not start. \n\t%s'%(error)       
             self.EventLog.info(errorMsg)
             self._printWarning(errorMsg)
         else:
