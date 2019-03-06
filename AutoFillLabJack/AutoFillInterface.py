@@ -605,8 +605,8 @@ class AutoFillInterface():
         '''
         if detector == 'Line Chill':
             returnString = '\t'+detector+'\n'
-            returnString += '\t'+ 'Enabled-> ' +bcolors.OKGREEN+self.lineChillEnabled+bcolors.ENDC+'\n'\
-                            +'\t'+'Line Chill Timeout-> '+bcolors.OKGREEN+'%d'%self.lineChillTimeout+bcolors.ENDC
+            returnString += '\t'+ 'Fill Enabled-> ' +bcolors.OKGREEN+self.lineChillEnabled+bcolors.ENDC+'\n'\
+                            +'\t'+'Maximum Fill Time-> '+bcolors.OKGREEN+'%d'%self.lineChillTimeout+bcolors.ENDC
         else:
             returnString = '\t'+detector+'\n'
             for setting in self.detectorSettings:

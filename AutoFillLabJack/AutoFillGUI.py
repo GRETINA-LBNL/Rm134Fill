@@ -247,7 +247,11 @@ class AutoFillGUI():
         :possibleName: - string, name to check if it is valid
         '''
         if ' ' in possibleName:
-            msg = "'%s' not a valid name, contains a space"%(possibleName)
+            msg = "'%s' not a valid name, contains a space."%(possibleName)
+            self._printError(msg)
+            return False
+        elif possibleName == 'chill':
+            msg = "'%s' not a valid name, it is short hand for Line Chill."%(possibleName)
             self._printError(msg)
             return False
         try:
