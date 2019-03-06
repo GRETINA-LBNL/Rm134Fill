@@ -25,23 +25,23 @@ class AutoFillGUI():
         Constructor
         '''
         self.cleanDict = {"Name":str,
-                          'Maximun Fill Time':int,
+                          'Maximum Fill Time':int,
                           'Minimum Fill Time':int,
                           'Detector Max Temperature':int}
 
         self.shortHand = {'enabled':'Fill Enabled',
                           'schedule':'Fill Schedule',
-                          'maximum':'Maximun Fill Time',
+                          'maximum':'Maximum Fill Time',
                           'minimum':'Minimum Fill Time',
                           'temp':'Detector Max Temperature',
                           'name':'Name',
                           'logging':'Temperature Logging'}
 
-        self.chillShortHand = {'enabled':'Fill Enabled','timeout':'Chill Timeout'}
+        self.chillShortHand = {'enabled':'Fill Enabled','maximum':'Maximum Fill Time'}
         
         self.timeFormat = '%H:%M'
-        self.inputSelectDict ={'set':self.detectorSettingsInput,
-                               'get':self.checkDetectorSettingsInput,
+        self.inputSelectDict ={'set':self.setDetectorSettingsInput,
+                               'get':self.getDetectorSettingsInput,
                                'temp':self.detectorTempInput,
                                'error':self.errorInput,
                                'start':self.startInput,
@@ -119,7 +119,7 @@ class AutoFillGUI():
         self.EventLog = logging.getLogger('EventLog')
         
         
-    def detectorSettingsInput(self,text):
+    def setDetectorSettingsInput(self,text):
         '''
         Take the input and confirm it is the correct type
         :text: - input from the user that is changing, should be '1 Enabled True' => Detector 1 Fill Enabled True
@@ -144,30 +144,30 @@ class AutoFillGUI():
                 msg = '"%s" not a valid option for %s'%(sptext[1],detector)
                 self._printError(msg)
                 return False
-            if option == 'Fill Schedule':
-                value = self._fillScheduleInput(sptext)
-                if value == False:
-                    return value
-            elif option == 'Fill Enabled' or option == 'Temperature Logging': 
-                value = self._boolInput(sptext)
-                if value == False:
-                    return value
-            elif option == 'Name': #the values for names may have spaces in them so join them together
-                values = sptext[2:] #get all the values
-                value = ' '.join(values) #Make sure to get all the value the user wrote
-                valid = self._checkValidName(value)
-                if valid == False:
-                    return False
-                    
-            else:
-                try:
-                    value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for the option
-                except:
-                    errorString = '"%s" not a valid value for %s setting %s'%(sptext[2],detector,option)
-                    self._printError(errorString)
-                    return False
-            self.interface.changeDetectorSetting(detector,option,value)
-            self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
+        if option == 'Fill Schedule':
+            value = self._fillScheduleInput(sptext)
+            if value == False:
+                return value
+        elif option == 'Fill Enabled' or option == 'Temperature Logging': 
+            value = self._boolInput(sptext)
+            if value == False:
+                return value
+        elif option == 'Name': #the values for names may have spaces in them so join them together
+            values = sptext[2:] #get all the values
+            value = ' '.join(values) #Make sure to get all the value the user wrote
+            valid = self._checkValidName(value)
+            if valid == False:
+                return False
+                
+        else:
+            try:
+                value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for option the
+            except:
+                errorString = '"%s" not a valid value for %s setting %s'%(sptext[2],detector,option)
+                self._printError(errorString)
+                return False
+        self.interface.changeDetectorSetting(detector,option,value)
+        self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
             
     def _fillScheduleInput(self,sptext):
         '''
@@ -223,20 +223,22 @@ class AutoFillGUI():
             1 -> Detector 1
             <name> -> Detector 1    
         '''
-        if nameText in self.detectorNumbers:
-            detectorNumber = nameText
-        else:
-            try:
-                detectorNumber = self.detectorNamesDict[nameText]
-            except KeyError:
-                detectors = ''
-                msg = '"%s" not a valid detector number or name'%(nameText)
-                self._printError(msg)
-                return False
         if nameText == 'chill':
             returnName = 'Line Chill'
         else:
-            returnName = 'Detector %s'%detectorNumber
+            if nameText in self.detectorNumbers:
+                detectorNumber = nameText
+                
+            else:
+                try:
+                    detectorNumber = self.detectorNamesDict[nameText]
+                    
+                except KeyError:
+                    detectors = ''
+                    msg = '"%s" not a valid detector number or name'%(nameText)
+                    self._printError(msg)
+                    return False
+            returnName = 'Detector %s'%detectorNumber    
         return returnName
     
     def _checkValidName(self, possibleName):
@@ -281,7 +283,7 @@ class AutoFillGUI():
         self.interface.writeDetectorSettings(detectors,settings,values)
         self.detectorNamesDict = self.interface.detectorNamesDict
         
-    def checkDetectorSettingsInput(self,text):
+    def getDetectorSettingsInput(self,text):
         '''
         Check the detector settings for the 
         :text: - options for getting detector settings command, '1'
@@ -319,7 +321,7 @@ class AutoFillGUI():
     
     def writeSettingsInput(self,text):
         '''
-        Write the settings that the user entered using the detectorSettingsInput method
+        Write the settings that the user entered using the setDetectorSettingsInput method
         :text: - not used, needed to make the function match the others
         '''
         detectors,settings,values = self.checkDetectorChanges()
@@ -329,7 +331,7 @@ class AutoFillGUI():
         answer = raw_input('Write the settings show above(Y/n)?')
         if answer.upper() == 'Y':
             self.writeDetectorChanges(detectors,settings,values)
-            print 'Settings have been written'
+            print 'Settings have been written.'
         else:
             print "Fine I won't\n"
     

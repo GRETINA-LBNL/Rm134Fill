@@ -631,6 +631,7 @@ class AutoFillInterface():
             self.detectorChangesDict[detector]['Settings'] = [setting]
             self.detectorChangesDict[detector]['Values'] = [value]
             
+
     def collectDetectorSettings(self):
         '''
         Collect the changes that will be made by the user and report, the user will reply with yes or no then _writecfg is called to write
@@ -680,7 +681,13 @@ class AutoFillInterface():
         #make a copy of config dict, so it will not be effected when the new dict is constructed
         settingsDict = copy.deepcopy(self.detectorConfigDict) 
         for (detector,option,value) in zip(sections,options,values):
-            settingsDict[detector][option] = value #set the new values for the detectors
+            if detector == 'Line Chill':
+                if option == 'Fill Enabled':
+                    self.lineChillEnabled=value
+                elif option == 'Maximum Fill Time':
+                    self.lineChillTimeout=value
+            else:
+                settingsDict[detector][option] = value #set the new values for the detectors
         enabledDetectors = []
         for detector in self.detectors:
             if settingsDict[detector]['Fill Enabled'] == 'True':
