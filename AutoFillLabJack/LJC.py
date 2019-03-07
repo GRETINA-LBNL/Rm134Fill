@@ -198,10 +198,13 @@ class LJC(object):
         values = []
         for (detector,value) in zip(detectorList,ledStates):
             names.append(self.enableLEDDict[detector]) #build the list of port names to write the
-            if value ==True: #convert to On Off to 1,0
+            if value == True: #convert to On Off to 1,0
                 values.append(1)
             elif value == False:
                 values.append(0)
+            else:
+                msg="Not A Valid Option"
+                print repr(value), msg
         self.EventLog.debug('Writing %s to enable leds for %s'%(values,names))
         return self._LJWriteValues(names,values) #return the values  
     

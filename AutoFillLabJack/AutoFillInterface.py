@@ -228,7 +228,8 @@ class AutoFillInterface():
         lineChillEnabled = cnfgFile.get('Line Chill','Fill Enabled')
         if lineChillEnabled == 'True' or lineChillEnabled == 'False':
             self.lineChillEnabled = lineChillEnabled
-        self.lineChillTimeout = float(cnfgFile.get('Line Chill','Maximun Fill Time'))
+        
+        self.lineChillTimeout = float(cnfgFile.get('Line Chill','Maximun Fill Time'))  
         errorMsgLst = self.checkValidConfiguration(self.detectorConfigDict,self.enabledDetectors)
         return errorMsgLst
        
@@ -241,7 +242,12 @@ class AutoFillInterface():
         if len(self.enabledDetectors) != 0: #if there are no enabled detectors then do turn any of the leds on
             states = [True]*len(self.enabledDetectors)
             self.writeEnableLEDState(self.enabledDetectors, states)
-        self.writeEnableLEDState(['Line Chill'], [self.lineChillEnabled])
+        if self.lineChillEnabled == 'True':
+            chillState = True
+        elif self.lineChillEnabled == 'False':
+            chillState = False
+        self.writeEnableLEDState(['Line Chill'],[chillState])
+        
         self.loadConfigEvent.clear()
     
     def startRunThread(self):
