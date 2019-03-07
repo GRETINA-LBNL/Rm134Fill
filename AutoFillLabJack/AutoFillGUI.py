@@ -254,13 +254,13 @@ class AutoFillGUI():
             msg = "'%s' not a valid name, it is short hand for Line Chill."%(possibleName)
             self._printError(msg)
             return False
-        try:
-            self.detectorNamesDict[possibleName]
-            msg = "'%s' not a valid name, name is currently being used."%(possibleName)
-            self._printError(msg)
-            return False
-        except KeyError:
-            return True
+#        try:
+#            self.detectorNamesDict[possibleName]
+#            msg = "'%s' not a valid name, name is currently being used."%(possibleName)
+#            self._printError(msg)
+#            return False
+#        except KeyError:
+#            return True
 
     def checkDetectorChanges(self):
         '''
@@ -487,7 +487,8 @@ class AutoFillGUI():
         :text: -not used
         '''
         msgStr = self.interface.loadDetectorConfig()
-        if msgStr != []:
+        print 'Msg',msgStr
+        if msgStr != '':
             self._printWarning(msgStr)
             
     def mainInput(self):
