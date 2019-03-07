@@ -234,7 +234,8 @@ class AutoFillGUI():
                     msg = '"%s" not a valid detector number or name'%(nameText)
                     self._printError(msg)
                     return False
-            returnName = 'Detector %s'%detectorNumber    
+            returnName = 'Detector %s'%detectorNumber   
+ 
         return returnName
     
 #    def _checkValidName(self, possibleName):
@@ -308,15 +309,22 @@ class AutoFillGUI():
         total command will be 'temp 1'
         ''' 
         self.checkThreadRunning()
-        detectorNumber = self._detectorNameConversion(text)
-        if detectorNumber == False:
+        detectorNumbers = []
+        if text == 'all':
+            for num in self.detectorNumbers:
+                detectorNumbers.append(self._detectorNameConversion(num))
+        else:
+            detectorNumber = self._detectorNameConversion(text)
+            detectorNumbers.append(detectorNumber)
+
+        if False in detectorNumbers:
             return False
         
-        temps,names = self.interface.getDetectorTemps(detectorNumber)
+        temps,names = self.interface.getDetectorTemps(detectorNumbers)
         displayString = ''
         for (detector,name,temp) in zip(detectorNumbers,names,temps):
             displayString += '\t%s (%s) temperature:'%(detector,name)+\
-                            bcolors.OKGREEN+' %s%sC'%(temp,u"\u00b0")+bcolors.ENDC
+                            bcolors.OKGREEN+' %sC\n'%(temp)+bcolors.ENDC
         print displayString
     
     def writeSettingsInput(self,text):
