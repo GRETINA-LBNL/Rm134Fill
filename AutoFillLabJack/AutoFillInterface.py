@@ -734,7 +734,7 @@ class AutoFillInterface():
             return []
         #make a fill start and end time, check that other fill start times do not fall between start and end time
 
-    def checkNameConflict(self,detectorConfigDict):
+    def checkValidName(self,detectorConfigDict):
         '''
         Check for conflicts in the detector names, ie no detectors should have the same nameText
         :detectorConfigDict: - dictionary of the settings 
@@ -743,6 +743,12 @@ class AutoFillInterface():
         errorList = []
         for detectorNum in detectorConfigDict.iterkeys():
             name = detectorConfigDict[detectorNum]['Name']
+            if ' ' in name:        
+                errMsg = '"%s" not a valid name for %s, name contains a space.'%(name,detectorNum)
+                errorList.append(errMsg)
+            if name == 'chill':
+                errMsg = '"%s" not a valid name for %s, name can not be chill.'%(name,detectorNum)
+                errorList.append(errMsg)
             if name in names:
                 errMsg = '"%s" not a valid name for %s, name already used.'%(name,detectorNum)
                 errorList.append(errMsg)
@@ -852,7 +858,7 @@ class AutoFillInterface():
         errorLst = []
         errorLst += self.checkFillScheduleConflicts(detectorSettingsDict,enabledDetectors)
         errorLst += self.checkMinFillMaxFillConflicts(detectorSettingsDict)
-        errorLst += self.checkNameConflict(detectorSettingsDict)
+        errorLst += self.checkValidName(detectorSettingsDict)
         errors = []
         for error in errorLst:
             if error != '':

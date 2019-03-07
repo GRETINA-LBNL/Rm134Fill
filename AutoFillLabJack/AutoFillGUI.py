@@ -154,11 +154,7 @@ class AutoFillGUI():
                 return value
         elif option == 'Name': #the values for names may have spaces in them so join them together
             values = sptext[2:] #get all the values
-            value = ' '.join(values) #Make sure to get all the value the user wrote
-            valid = self._checkValidName(value)
-            if valid == False:
-                return False
-                
+            value = ' '.join(values) #Make sure to get all the value the user wrote           
         else:
             try:
                 value = self.cleanDict[option](sptext[2]) #use the clean dict to confirm the correct type of input for option the
@@ -241,19 +237,19 @@ class AutoFillGUI():
             returnName = 'Detector %s'%detectorNumber    
         return returnName
     
-    def _checkValidName(self, possibleName):
-        '''
-        check the name does not have any spaces in items
-        :possibleName: - string, name to check if it is valid
-        '''
-        if ' ' in possibleName:
-            msg = "'%s' not a valid name, contains a space."%(possibleName)
-            self._printError(msg)
-            return False
-        elif possibleName == 'chill':
-            msg = "'%s' not a valid name, it is short hand for Line Chill."%(possibleName)
-            self._printError(msg)
-            return False
+#    def _checkValidName(self, possibleName):
+#        '''
+#        check the name does not have any spaces in items
+#        :possibleName: - string, name to check if it is valid
+#        '''
+#        if ' ' in possibleName:
+#            msg = "'%s' not a valid name, contains a space."%(possibleName)
+#            self._printError(msg)
+#            return False
+#        elif possibleName == 'chill':
+#            msg = "'%s' not a valid name, it is short hand for Line Chill."%(possibleName)
+#            self._printError(msg)
+#            return False
 #        try:
 #            self.detectorNamesDict[possibleName]
 #            msg = "'%s' not a valid name, name is currently being used."%(possibleName)
