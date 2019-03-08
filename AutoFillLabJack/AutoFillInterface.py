@@ -653,7 +653,9 @@ class AutoFillInterface():
                 detectors.append(detector)
                 settings.append(setting)
                 values.append(value)
-                returnString += '%s %s will be set to ->'%(detector,setting)+\
+                with self.configDictLock:
+                    name = self.detectorConfigDict[detector]['Name']
+                returnString += '%s (%s) %s will be set to ->'%(detector,name,setting)+\
                                 bcolors.OKGREEN+' %s \n'%(value)+bcolors.ENDC
         self.detectorChangesDict = {} #clean the dict so the settings will not be repeated
         return detectors,settings,values,returnString
