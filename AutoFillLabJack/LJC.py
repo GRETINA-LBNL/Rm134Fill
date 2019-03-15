@@ -319,7 +319,7 @@ class LJC(object):
         try:
             ljm.eWriteNames(self.controller, numFrames, names, values)
         except LJMError:
-            msg = 'Setting %s to values %s'%(names,values)
+            msg = 'Failed in setting %s to values %s'%(names,values)
             print msg
 #         print 'E',errorAddress
 #         if not errorAddress:

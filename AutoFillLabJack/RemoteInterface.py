@@ -108,7 +108,7 @@ class RemoteInterface(object):
         :text: - options for getting detector settings command, '1'
         full command is 'get 1'
         '''   
-        if text not in ['1','2','3','4','5','5']:
+        if text not in ['1','2','3','4','5','6']:
             errorString = '"%s" not a valid detector number'%text
             print errorString
             return False

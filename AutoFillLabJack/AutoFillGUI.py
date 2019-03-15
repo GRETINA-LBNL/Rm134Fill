@@ -491,7 +491,6 @@ class AutoFillGUI():
         :text: -not used
         '''
         msgStr = self.interface.loadDetectorConfig()
-        print 'Msg',msgStr
         if msgStr != '':
             self._printWarning(msgStr)
             

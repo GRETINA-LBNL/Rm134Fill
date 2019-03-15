@@ -12,6 +12,7 @@ from datetime import timedelta as td
 import time
 from email.mime.text import MIMEText
 import smtplib
+from subprocess import Popen, PIPE
 import copy
 import logging
 import sys
@@ -60,6 +61,8 @@ class AutoFillInterface():
         self.ventCloseThresholdTemp = -230 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
         self.errorRepeatLimit = 2 #number of times the error needs to show
+        self.emailRecipents = 'adonoghue@lbl.gov'
+        self.senderEmail    = 'gretianfilling@gmail.com'
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.mainThreadName = 'MainControlThread'
         self.valuesDictLock = threading.Lock()
@@ -320,12 +323,12 @@ class AutoFillInterface():
                 # check for filling timeout, set error and close valve if nessassary 
                 self.checkFillTimeout()
                 #check for errors with filling or detector temperature
-            errorBody = self.checkDetectorErrors() #get the email body and possibly send an email
-#             if errorBody != '':
+              
             curTime = time.time()
             startScan = curTime + self.pollTime
-#             print 'Thread repeats',threadRepeat
-#             threadRepeat +=1
+            self.decideToSendEmail()
+            if self.errorList != []:
+                self.LJ.writeErrorState(True)
             self.LJ.heartbeatFlash() #flash the heart beat before any breaks can happen, different flash is used when stopping thread 
             while curTime < startScan: #while the thread sleeps check the fill inhibit, stoprunning, loadconfig
                 if self.stopRunningEvent.isSet() == True:
@@ -487,16 +490,15 @@ class AutoFillInterface():
                 self.EventLog.info('Closing %s fill valve, Maximum Fill Time reached'%detector)
             self.cleanValuesDict(valvesToClose)
             
-    def checkDetectorErrors(self):
+    def constructDetectorErrors(self):
         '''
         Check the error in the error dict and compose and email body
         '''   
         if self.errorList == []: #if no errors 
-            return
+            return ''
 #             self.errorDict = {}
 #             self.LJ.writeErrorState(False)
         for error in self.errorList:
-            self.LJ.writeErrorState(True)
             try:
                 self.errorDict[error] += 1
             except KeyError:
@@ -550,11 +552,20 @@ class AutoFillInterface():
         self.LJ.writeErrorState(False)
         return True
     
+    def decideToSendEmail(self):
+        '''
+        Decide what (if any) emails need to be sent and what is in the email
+        '''
+        emailBody = self.constructDetectorErrors();
+        if emailBody != '':
+            self.sendEmail(emailBody)
+        
     def sendEmail(self,emailBody):
         '''
         send the email of the errors
         :emailBody: - string of the errors, they are seperated by ','
         '''
+        print 'Sending Email'
         if emailBody == '':
             return
         else:
@@ -563,26 +574,25 @@ class AutoFillInterface():
             else:
                 errorBody = emailBody+'\n'
         tempString = ''
-        for detector in self.detectors: #make a string of the last read detector temperatures
-            temp = self.detectorValuesDict[detector]['Detector Temperature']
-            detStr = '%s current temperature %s\n'%(self.detectorConfigDict['Name'],temp)
-            tempString+=detStr
-        errorBody += tempString
-        try:
-            server = smtplib.SMTP('localhost') #use the open port to send the message
-        except:
-#             self.EventLog.exception('Tried to contact mail server and failed')
-            return False
+        
+        with self.valuesDictLock and self.configDictLock:
+            for detector in self.enabledDetectors: #make a string of the last read detector temperatures
+                temp = self.detectorValuesDict[detector]['Detector Temperature']
+                name = self.detectorConfigDict[detector]["Name"]
+                detStr = '%s (%s) current temperature %sC\n'%(detector,name,temp)
+                tempString+=detStr
+        errorBody += '\n'+tempString
         msg = MIMEText(errorBody+self.emailSignature)
-        msg['Subject'] = 'Dewar Fill Level'
+        msg['Subject'] = 'Room 134 Liquid Nitrogen Fill System'
         msg['From'] = self.senderEmail
         msg['To'] = self.emailRecipents
-        if ',' in self.emailRecipents: #if there are multiple reciepents then the email has to be split in to a list
-            server.sendmail(self.senderEmail, self.emailRecipents.split(','), msg.as_string()) #note the localhost email must be used
-            #to contaact the server. the baseEmail will show up as the from.
-        else: #else just send the single recipent as a list
-            server.sendmail(self.senderEmail, [self.emailRecipents], msg.as_string())
-        server.quit()  
+      
+#        msg['Subject'] = 'Room 134 Liquid Nitrogen Fill System'
+#        msg['From'] = self.senderEmail
+#        msg['To'] = self.emailRecipents
+#        print msg.as_string()
+        p = Popen(["msmtp", "-a", "gmail",'-t'], stdin=PIPE)
+        p.communicate(msg.as_string())         
             
             
     def checkFillInhibit(self):
