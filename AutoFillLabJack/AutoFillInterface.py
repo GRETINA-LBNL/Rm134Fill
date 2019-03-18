@@ -34,6 +34,7 @@ class AutoFillInterface():
         '''
         self.errorDict = {} #storage dict for errors that occur every time the LJ is polled
         self.errorList = [] #storage of error string recored for each LJ poll
+        self.errorEmailDict = {} #storage for the errors that have been emailed
         self.detectorConfigDict = {} #locations for setting for the detector
         self.detectorValuesDict = {} #storage for the detectors current settings
         self.detectorChangesDict = {}       
@@ -60,8 +61,9 @@ class AutoFillInterface():
         self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
         self.ventCloseThresholdTemp = -230 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
-        self.errorRepeatLimit = 2 #number of times the error needs to show
-        self.emailRecipents = 'adonoghue@lbl.gov'
+        self.errorRepeatLimit = 2 #number of times the error needs to show before it is emaild
+        self.errorEmailRepeatLimit = 3 #number of error has crosses errorRepeatLimit before getting emailed again
+        self.emailRecipents = 'gretianfilling@gmail.com'
         self.senderEmail    = 'gretianfilling@gmail.com'
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.mainThreadName = 'MainControlThread'
@@ -307,15 +309,18 @@ class AutoFillInterface():
             # read all the detector temps temperatures
             self.readDetectorTemps()
             self.logDetectorTemps() #log the temps that are enabled.
-            # if the check configuration event is set read the configuration list to get a list of enabled detectors and other  
-            # check temperatures for any enabled detectors that are above Maximum temperature, set error LED and send email is nessassary
+            # if the check configuration event is set read the configuration 
+                #list to get a list of enabled detectors and other  
+            # check temperatures for any enabled detectors that are 
+                #above Maximum temperature, set error LED and send email is nessassary
             
             self.checkDetectorTemperatures()
             # check enabled detector's settings and start fills if needed
             self.checkFillInhibit()
             self.checkStartDetectorFills()
 #             print 'Detector 1 valve state',self.detectorValuesDict['Detector 1']['Valve State']
-            if self.inihibitFills == False: #if the inhibit fills is true no new fills will be started so don't do anyother checking
+            if self.inihibitFills == False: #if the inhibit fills is true no new 
+                                            #fills will be started so don't do anyother checking
                 # check currently filling detectors for min fill time breach
                 self.checkMinFillTime()
                 # for filling detectrors check for vent temp reaching LN levels
@@ -327,9 +332,11 @@ class AutoFillInterface():
             curTime = time.time()
             startScan = curTime + self.pollTime
             self.decideToSendEmail()
+            print "Errors:",self.errorList
             if self.errorList != []:
                 self.LJ.writeErrorState(True)
-            self.LJ.heartbeatFlash() #flash the heart beat before any breaks can happen, different flash is used when stopping thread 
+            self.LJ.heartbeatFlash() #flash the heart beat before any breaks can happen, 
+                                        #different flash is used when stopping thread 
             while curTime < startScan: #while the thread sleeps check the fill inhibit, stoprunning, loadconfig
                 if self.stopRunningEvent.isSet() == True:
                     break
@@ -498,12 +505,13 @@ class AutoFillInterface():
             return ''
 #             self.errorDict = {}
 #             self.LJ.writeErrorState(False)
+        errorDict = {} #rewrite the error dict each time to make sure errors do not get counted mulitple times
         for error in self.errorList:
             try:
-                self.errorDict[error] += 1
+                errorDict[error] += 1
             except KeyError:
-                self.errorDict[error] = 1
-        
+                errorDict[error] = 1
+        self.errorDict = errorDict
         emailBody = ''
         for (error, numRepeat) in self.errorDict.iteritems():
             if numRepeat >= self.errorRepeatLimit:
@@ -550,22 +558,39 @@ class AutoFillInterface():
         self.errorDict = {}
         self.errorList = []
         self.LJ.writeErrorState(False)
+        self.errorEmailDict = {}
         return True
     
     def decideToSendEmail(self):
         '''
         Decide what (if any) emails need to be sent and what is in the email
         '''
-        emailBody = self.constructDetectorErrors();
-        if emailBody != '':
+        validErrors = self.constructDetectorErrors();
+        emailErrorList = []
+        if validErrors=='':
+            return 
+        for error in validErrors.split(','):
+            try:
+                errorCount = self.errorEmailDict[error]
+                if errorCount > self.errorEmailRepeatLimit:
+                    emailErrorList.append(error)
+                    self.errorEmailDict[error] = 0
+                self.errorEmailDict[error] = errorCount+1
+            except KeyError: #send the error the first time it is reported
+                self.errorEmailDict[error] = 0
+                emailErrorList.append(error)
+        
+        if emailErrorList != []:
+            emailBody = ','.join(emailErrorList)
+            print "Sending:",emailBody            
             self.sendEmail(emailBody)
+
         
     def sendEmail(self,emailBody):
         '''
         send the email of the errors
         :emailBody: - string of the errors, they are seperated by ','
         '''
-        print 'Sending Email'
         if emailBody == '':
             return
         else:
@@ -586,11 +611,6 @@ class AutoFillInterface():
         msg['Subject'] = 'Room 134 Liquid Nitrogen Fill System'
         msg['From'] = self.senderEmail
         msg['To'] = self.emailRecipents
-      
-#        msg['Subject'] = 'Room 134 Liquid Nitrogen Fill System'
-#        msg['From'] = self.senderEmail
-#        msg['To'] = self.emailRecipents
-#        print msg.as_string()
         p = Popen(["msmtp", "-a", "gmail",'-t'], stdin=PIPE)
         p.communicate(msg.as_string())         
             
