@@ -73,8 +73,7 @@ class AutoFillInterface():
         self.remoteCmdDict = {'get':self.readDetectorConfig,'temp':self.getDetectorTemps,
                                 'error':self.readDetectorErrors}
         self.pollTime = 30
-        self.HOST = 'localhost'
-        self.PORT = 50088
+        
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
        
@@ -332,7 +331,6 @@ class AutoFillInterface():
             curTime = time.time()
             startScan = curTime + self.pollTime
             self.decideToSendEmail()
-            print "Errors:",self.errorList
             if self.errorList != []:
                 self.LJ.writeErrorState(True)
             self.LJ.heartbeatFlash() #flash the heart beat before any breaks can happen, 
@@ -581,8 +579,7 @@ class AutoFillInterface():
                 emailErrorList.append(error)
         
         if emailErrorList != []:
-            emailBody = ','.join(emailErrorList)
-            print "Sending:",emailBody            
+            emailBody = ','.join(emailErrorList)        
             self.sendEmail(emailBody)
 
         
@@ -935,53 +932,7 @@ class AutoFillInterface():
         plt.show(block=True)
         
         
-    def startSocketThread(self):
-        '''
-        Start the thread that runs the socket for the remote client
-	'''
-        socketThread = threading.Thread(target=self.socketThread,name='SocketThread',args=())
-        socketThread.start()
-            
-            
-    def socketThread(self):
-        '''
-        Thread that will listen to the socket and reply to data sent to it. The thread is started at the when the interface is 
-        started. It is stopped when init release is called
-        '''
-        SOC = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        SOC.bind((self.HOST,self.PORT))
-        SOC.listen(1)
-        conn,addr = SOC.accept()
-        msg = 'Address %s has been connected to socket'%addr
-        self.EventLog.info(msg)
-        while True:
-            cmd = conn.recv(1024)
-            replyData = self._socketCommandRequest(cmd)
-            conn.send(replyData)
-            if self.initReleaseEvent.is_set():
-                break
-        conn.close()
-        
-    def _socketCommandRequest(self,commandString):
-        '''
-        Take the data received from the socket and decides what function needs to be called, which will gather the proper data
-        Inputs:
-            :commandString: - String received from the socket, example 'get Detector 1' -> get the current settings for detector 1
-                              The strings may contain mulitple commans separated by a ','
-        '''
-        if ',' in commandString:
-            cmds = commandString.split(',')
-        else:
-            cmds = [commandString]
-        returnString = ''
-        for cmd in cmds:
-            scmd = cmd.split(' ')
-            cmdType = scmd.pop(0)
-            cmdFunction = self.remoteCmdDict[cmdType]
-            cmdText = ' '.join(scmd)
-            data = cmdFunction(cmdText)
-            returnString += ', %s'%data
-        return returnString
+    
 
 
 class bcolors:

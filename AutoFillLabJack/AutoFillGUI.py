@@ -5,10 +5,11 @@ Created on Sep 16, 2016
 '''
 # import curses
 # import time
+import threading
 from datetime import datetime as dt
 from AutoFillLabJack.AutoFillInterface import AutoFillInterface
 from time import sleep
-from threading import Event
+#from threading import Event
 import logging.config
 import socket
 from labjack.ljm import LJMError
@@ -51,6 +52,7 @@ class AutoFillGUI():
                                'load':self.loadInput,
                                'graph':self.graphInput,
                                'help':self.helpInput}
+        self.allowedRemoteInputSelect=['get','temp','error','help']
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
@@ -61,13 +63,18 @@ class AutoFillGUI():
             self.HelpFile = '/home/gretina/Rm134Fill/AutoFillLabJack/HelpDoc.txt'
             self.MiniHelpFile = '/home/gretina/Rm134Fill/AutoFillLabJack/MiniHelpDoc.txt'
         self.getLogs()
-        self.exitEvent = Event()
+        self.exitEvent = threading.Event()
+        #remote interface stuff
+        self.endSend = '*' #indicates the end of data sent from the remote interface
+        self.HOST = 'localhost'
+        self.PORT = 50088
         
     def initInterface(self):
         '''
         Initalize the interface module
         '''
         i=0
+        self.startSocketThread()
         while i<3:
             try:
                 msgStatus = "Try #%d to initalize Controller"%i
@@ -119,11 +126,11 @@ class AutoFillGUI():
         self.EventLog = logging.getLogger('EventLog')
         
         
-    def setDetectorSettingsInput(self,text):
+    def setDetectorSettingsInput(self,text,remote=False):
         '''
         Take the input and confirm it is the correct type
         :text: - input from the user that is changing, should be '1 Enabled True' => Detector 1 Fill Enabled True
-        
+        :remote: - not used. Needed to be consistant with the other input functions
         '''
         sptext = text.split(' ')
         detector = self._detectorNameConversion(sptext[0])
@@ -191,11 +198,12 @@ class AutoFillGUI():
         value = sptext[2]   
         return value
     
-    def _boolInput(self,sptext):
+    def _boolInput(self,sptext,remote=False):
         '''
         Handle the detector options that have True/False value options
         including Fill Enabled and Temperature Logging
         :sptext: - text input from commands that have True/False values
+        :remote: - bool, not used, needed to be consistant with input functions
         '''
         inputValue = sptext[2].capitalize()            
         if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
@@ -284,7 +292,7 @@ class AutoFillGUI():
         self.interface.writeDetectorSettings(detectors,settings,values)
         self.detectorNamesDict = self.interface.detectorNamesDict
         
-    def getDetectorSettingsInput(self,text):
+    def getDetectorSettingsInput(self,text,remote=False):
         '''
         Check the detector settings for the 
         :text: - options for getting detector settings command, '1'
@@ -299,14 +307,20 @@ class AutoFillGUI():
             detectorName = self._detectorNameConversion(number)
             if detectorName == False: #if the name conversion fails exit the function
                 return False
-            print '\n'+self.interface.readDetectorConfig(detectorName)
+            displayString = self.interface.readDetectorConfig(detectorName)          
+            if remote == True:
+                return displayString
+            elif remote == False:        
+                print '\n'+ displayString
         
     
-    def detectorTempInput(self,text):
+    def detectorTempInput(self,text,remote=False):
         '''
         Display the current temperature for the detector number
         :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
-        total command will be 'temp 1'
+                total command will be 'temp 1'
+        :remote: - bool. If True the resulting string will be returned. If False the string will be printed
+                    to the screen. 
         ''' 
         self.checkThreadRunning()
         detectorNumbers = []
@@ -325,7 +339,10 @@ class AutoFillGUI():
         for (detector,name,temp) in zip(detectorNumbers,names,temps):
             displayString += '\t%s (%s) temperature:'%(detector,name)+\
                             bcolors.OKGREEN+' %sC\n'%(temp)+bcolors.ENDC
-        print displayString
+        if remote == True:
+            return displayString
+        elif remote == False:        
+            print displayString
     
     def writeSettingsInput(self,text):
         '''
@@ -343,17 +360,21 @@ class AutoFillGUI():
         else:
             print "Fine I won't\n"
     
-    def errorInput(self,text):
+    def errorInput(self,text,remote=False):
         '''
         Check the interface for any errors
-        :text: - to dispaly error this is empty, to clear errors this will be 'clear'
+        :text: - string, to display error this is empty, to clear errors this will be 'clear'
+        :remote: - bool, if True resulting string is returned. If False data will be printed to string.
         '''
         if text == 'clear':
             self.interface.cleanErrorDict()
             self.EventLog.info('Cleaning error log')
         else:
             errorString = self.interface.readDetectorErrors()
-            self._printError(errorString)
+            if remote == True:
+                return errorString
+            elif remote == False:        
+                self._printError(errorString)
 
     def _printWarning(self,warningMsg):
         '''
@@ -408,7 +429,7 @@ class AutoFillGUI():
 #             self.interface.setTempLogging(detector,value)
                   
                          
-    def commandInputs(self,text):
+    def commandInputs(self,text,remote=False):
         '''
         Select the input function baised on the first word in the command
         :text: - input text from user
@@ -420,15 +441,16 @@ class AutoFillGUI():
         except KeyError:
             msg = '"%s" not a valid command\n enter <help> to print help file' %(command)
             self._printError(msg)
-            return
+            return msg
         commandOptions = ' '.join(sText)
-        inputFunction(commandOptions)
-        return True
+        reply = inputFunction(commandOptions,remote)
+        return reply
     
-    def startInput(self,text):
+    def startInput(self,text,remote=False):
         '''
         start the running thread
         :text: - not used, needed to make it common
+        :remote: - bool, not used, needed to make method common 
         '''   
         error = self.interface.startRunThread()
         self.EventLog.info('Starting Auto Fill Operation')
@@ -440,29 +462,32 @@ class AutoFillGUI():
             msg = 'AutoFill Operation has Started.'
             self._printOKGreen(msg)
         
-    def stopInput(self,text):
+    def stopInput(self,text,remote=False):
         '''s
         stop the running thread
         :text: - not used, needed to make it common with other input function
+        :remote: - String, not used, needed to be common with other Input functions
         '''
         self.EventLog.info('Stopping Auto Fill Operation')
         self.interface.stopRunThread()
         self._printOKGreen("AutoFill Operation has Stopped.")
     
-    def exitInput(self,text):
+    def exitInput(self,text,remote=False):
         '''
         Stop the running thread then close everything
         :text: - not used, needed to make it common
+        :remote: - String, not used, needed to be common with other Input functions
         '''
         self.interface.initRelease()
         del self.interface
         self.EventLog.info('Exiting Auto Fill Program')
         self.exitEvent.set()
         
-    def helpInput(self,text):
+    def helpInput(self,text,remote=False):
         '''
         Print the help file to screen
         :text: - string, option from user. Either blank or 'all'
+        :remote: - bool, not used, needed to be consistant with other input functions
         '''
         
         if text == 'all':
@@ -474,10 +499,11 @@ class AutoFillGUI():
         
 #         print 'HELP!'
         
-    def graphInput(self,text):
+    def graphInput(self,text,remote=False):
         '''
         Produce a graph the detector temperature for the given detector number
         :text: - string, number of detector to produce graph for
+        :remote: - Not used. Needed to be consistant with all input functions
         '''
         detectorNumbers = self._detectorNameConversion(text)
         if detectorNumbers == False:
@@ -485,10 +511,11 @@ class AutoFillGUI():
         else:
             self.interface.graphDetectorTemp(detectorNumbers)
 
-    def loadInput(self,text):
+    def loadInput(self,text,remote):
         '''
         load the changes made to the configuration file
         :text: -not used
+        :remote: - String, not used, needed to be common with other Input functions
         '''
         msgStr = self.interface.loadDetectorConfig()
         if msgStr != '':
@@ -509,7 +536,68 @@ class AutoFillGUI():
             self.commandInputs(answer)
             if self.exitEvent.is_set() == True:
                 break
+
+    def startSocketThread(self):
+        '''
+        Start the thread that runs the socket for the remote client
+	'''
+        socketThread = threading.Thread(target=self.socketThread,name='SocketThread',args=())
+        socketThread.start()
+            
+            
+    def socketThread(self):
+        '''
+        Thread that will listen to the socket and reply to data sent to it. The thread is started at the when the interface is 
+        started. It is stopped when init release is called
+        '''
+        SOC = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        SOC.bind((self.HOST,self.PORT))
+        SOC.listen(1)
+        (conn,addr) = SOC.accept()
+        msg = 'Host %s connected to port %d'%(addr[0],addr[1])
+        self.EventLog.info(msg)
+        receivedData = ''
+        socketFile = SOC.makefile(mode='rw')
+        while True:
+            command = socketFile.read()
+            print 'COmmand:',command
+            if self.endSend in command:
+                break
+#            print "Start Recv"
+#            data = conn.recv(32)
+#            print "Data:",repr(data)
+#            receivedData += data  
+#            if self.endSend in receivedData:
+#                receivedData = receivedData.replace(self.endSend,'')
+#                print 'receivedData:',receivedData               
+#                replyData = self._socketCommandRequest(receivedData)
+#                print "Reply:",replyData
+#                conn.sendall(replyData)
+#                receivedData = ''
+
+            if self.exitEvent.is_set():
+                break
+        conn.close()
         
+    def _socketCommandRequest(self,commandString):
+        '''
+        Take the data received from the socket and decides what function needs to be called, 
+            which will gather the proper data
+        Inputs:
+            :commandString: - String received from the socket, example 'get Detector 1' -> 
+                                get the current settings for detector 1 The strings may 
+                                contain mulitple commans separated by a ','
+        '''
+        cmd = commandString.split(' ')[0]
+        print "Data:",commandString
+        if cmd in self.allowedRemoteInputSelect:
+            reply = self.commandInputs(commandString,remote=True)
+            return reply
+        else:
+            msg = "'%s' not allowed command from the remote interface."
+            return msg  
+        
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'

@@ -4,7 +4,8 @@ Created on Aug 22, 2017
 @author: ADonoghue
 '''
 import socket
-import logging
+import logging.config
+
 class RemoteInterface(object):
     '''
     This is the remote interface for the Rm134AutoFill system
@@ -17,11 +18,10 @@ class RemoteInterface(object):
         
         
         '''
-        self.inputSelectDict = {'get':self.checkDetectorSettingsInput,'temp':self.detectorTempInput,
-                                'error':self.errorInput,'help':self.helpInput}
-        
         self.PORT = 50088
         self.HOST = 'localhost'
+        self.hostname = socket.gethostname()
+        self.endSend = '*'
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winRemoteLogging.cfg'
             self.helpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\RemoteHelpDoc.txt'
@@ -30,10 +30,8 @@ class RemoteInterface(object):
             self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/remotelogging.cfg'
             self.helpFile = '/home/gretina/Rm134Fill/AutoFillLabJack/RemoteHelpDoc.txt'
         sucess = self.getLogs()
-        if sucess:
-            self.mainInput()
-        else:
-            return
+        self.mainInput()
+
     
     def getSocket(self):
         '''
@@ -42,6 +40,7 @@ class RemoteInterface(object):
         self.SOC = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.SOC.connect((self.HOST,self.PORT))
+            self.socketFile = self.SOC.makefile(mode='rw')
             return True
         except Exception as E:
             self.EventLog.warning('Failed to connect to socket, host %s | port %d'%(self.HOST,self.PORT))
@@ -49,6 +48,12 @@ class RemoteInterface(object):
             print 'Socket Connection Failed'
             return None
         
+    def _releaseSocket(self):
+        '''
+        Release the socket when the interface closes
+        '''
+        self.socketFile.close()
+        self.SOC.close()
 
     def getLogs(self):
         '''
@@ -58,82 +63,94 @@ class RemoteInterface(object):
         logging.config.fileConfig(fname=self.loggingConfigFile)
         self.EventLog = logging.getLogger('RemoteEventLog')
     
-    def commandInputs(self,text):
-        '''
-        Select the input function baised on the first word in the command
-        :text: - input text from user
-        '''
-        sText = text.split(' ')
-        command = sText.pop(0) # remove the first text entered, it is the command and the rest of the methods will not be used
-        try:
-            inputFunction = self.inputSelectDict[command]
-        except KeyError:
-            msg = '"%s" not a valid command\n enter <help> to print help file' %(command)
-            print msg
-            return
-        commandOptions = ' '.join(sText)
-        funcName = inputFunction.__name__
-        self.EventLog.info('Command %s called to gather information.'%funcName)
-        inputFunction(commandOptions)
-        return True
-    
-    def detectorTempInput(self,text):
-        '''
-        Display the current temperature for the detector number
-        :text: - options for command requesting detector temp, something like 'detector 1' or 'all' 
-        total command will be 'temp 1'
-        '''   
-        if text == 'all' or text == 'All':
-            detectors = []
-            for num in range(1,7): #1-6
-                detectors.append('Detector %d'%num)
-        else:
-            detectors = ['Detector %s'%text]
-        cmd = ','.join(detectors)
-        self.EventLog.debug('Sending %s to AutoFill process'%cmd)
-        self.SOC.send(cmd)
-        data = self.SOC.recv(1024) #the data returned will be a string containing the whole
-        self.EventLog.debug('Receving %s from AutoFill process'%data)
-        sdata = data.split(':')
-        temps = sdata[0].split(',')
-        names = sdata[1].split(',')
-        displayString = ''
-        for (detector,name,temp) in zip(detectors,names,temps):
-            displayString += '%s (%s) temperature %sC\n'%(detector,name,temp)
-        print displayString
-        
-    def checkDetectorSettingsInput(self,text):
-        '''
-        Check the detector settings for the 
-        :text: - options for getting detector settings command, '1'
-        full command is 'get 1'
-        '''   
-        if text not in ['1','2','3','4','5','6']:
-            errorString = '"%s" not a valid detector number'%text
-            print errorString
-            return False
-        else:
-            name = 'Detector %s'%text
-            cmd = 'get %s'%name
-            self.EventLog.debug('Sending %s to AutoFill Process'%cmd)
-            self.SOC.send(cmd)
-            data = self.SOC.recv(1024)
-            self.EventLog.debug('Received %s from the AutoFill Process'%data)
-            print data
+#    def commandInputs(self,text):
+#        '''
+#        Select the input function baised on the first word in the command
+#        :text: - input text from user
+#        '''
+#        sText = text.split(' ')
+#        command = sText.pop(0) # remove the first text entered, it is the command and the rest of the methods will not be used
+#        try:
+#            inputFunction = self.inputSelectDict[command]
+#        except KeyError:
+#            msg = '"%s" not a valid command\n enter <help> to print help file' %(command)
+#            print msg
+#            return
+#        commandOptions = ' '.join(sText)
+#        funcName = inputFunction.__name__
+#        self.EventLog.info('Command %s called to gather information.'%funcName)
+#        inputFunction(commandOptions)
+#        return True
             
+    def _printError(self,errorMsg):
+        '''
+        Print a fail to the scree, ie red
+        :errorMsg: - string that will be printed to the screen in red
+        '''
+        print '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
+
+    def _printOKGreen(self,okMsg):
+        '''
+        Print the ok msg to the screen in green
+        :okMsg: - string that will be printed to screen in green
+        '''
+        print '\t'+bcolors.OKGREEN+okMsg+bcolors.ENDC
+    
+    def _printOKBlue(self,okMsg):
+        '''
+        Print the ok msg to the screen in blue
+        :okMsg: - string that will be printed to screen in green
+        '''
+        print '\t'+bcolors.OKBLUE+okMsg+bcolors.ENDC
+
+    def _sendCommand(self,commandString):
+        '''
+        Send the command entered by the user to the socketThread
+        :commandString: - String, input from the users
+        '''
+        self.socketFile.write(commandString+self.endSend)
+        msg = "Sending '%s' through socket"%(commandString)
+        print msg
+        self.EventLog.debug(msg)
+
+    def _receiveCommandReply(self):
+        '''
+        Recieve reply from the sent command, 
+        '''
+        reply = ''
+        while True:
+            reply = self.socketFile.read()
+            print "reply:",reply
+            if self.endSend in reply:
+                break
+        return reply
+
     def mainInput(self):
         '''
         Main input for the user, feeds input to commandInputs() for completing tasks
         '''  
-        print 'Auto Fill program has been started, enter "start" to start auto fill operation.'
+        msg = 'Remote interface has started. Please enter the commands below.'
+        self._printOKGreen(msg)      
+        self.getSocket()
         while True:
-            if self.exitEvent.is_set() == True:
-                break
             answer = raw_input('>>')
-            self.EventLog.debug('Entered command: %s'%answer)
-            self.commandInputs(answer)
-            if self.exitEvent.is_set() == True:
+            if answer == 'exit':
+                self._releaseSocket()
                 break
+            self.EventLog.debug('Entered command: %s'%answer)
+            self._sendCommand(answer)
+            print self._receiveCommandReply()
+            
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 if __name__ == '__main__':
     remote = RemoteInterface()
