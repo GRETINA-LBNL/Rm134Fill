@@ -590,9 +590,8 @@ class AutoFillGUI():
         
         '''
         self.getSocket()
+        self.SOC.listen(1)
         while True:
-            
-            self.SOC.listen(1)
             (conn,addr) = self.SOC.accept()
             self._socketHandle(conn)
             if self.exitEvent.isSet():
