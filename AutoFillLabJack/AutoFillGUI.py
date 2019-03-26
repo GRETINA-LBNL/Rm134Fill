@@ -545,57 +545,81 @@ class AutoFillGUI():
         socketThread.start()
             
             
+
+    def getSocket(self):
+        '''
+        Get a hold of the socket that will be used to talk with the AutoFill control process
+        '''
+        self.SOC = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.SOC.bind((self.HOST,self.PORT))
+        
+    
+    def _releaseSocket(self,conn):
+        '''
+        Release the socket when the interface closes
+        '''
+        conn.shutdown(socket.SHUT_RDWR)
+        conn.close()
+#         self.SOC.close()
+    
+    def _sendCommand(self,conn,commandString):
+        '''
+        Send the command entered by the user to the socketThread
+        :commandString: - String, input from the users
+        '''
+        
+        writeSocketFile = conn.makefile(mode='w')
+        cleanCommand = commandString.replace('\n','|')
+        writeSocketFile.write(cleanCommand+'\n')
+        writeSocketFile.close()
+        msg = "Sending '%s' through socket"%(commandString)
+        print msg
+    
+    def _receiveCommandReply(self,conn):
+        '''
+        Recieve reply from the sent command, 
+        '''
+        replyFile = conn.makefile(mode='r')
+        reply = replyFile.readline()
+        replyFile.close()
+        reply = reply.replace('\n','')
+        return reply
+    
     def socketThread(self):
         '''
-        Thread that will listen to the socket and reply to data sent to it. The thread is started at the when the interface is 
-        started. It is stopped when init release is called
-        '''
-        SOC = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        SOC.bind((self.HOST,self.PORT))
-        SOC.listen(1)
-        (conn,addr) = SOC.accept()
-        msg = 'Host %s connected to port %d'%(addr[0],addr[1])
-        self.EventLog.info(msg)
-        receivedData = ''
-        socketFile = SOC.makefile(mode='rw')
-        while True:
-            command = socketFile.read()
-            print 'COmmand:',command
-            if self.endSend in command:
-                break
-#            print "Start Recv"
-#            data = conn.recv(32)
-#            print "Data:",repr(data)
-#            receivedData += data  
-#            if self.endSend in receivedData:
-#                receivedData = receivedData.replace(self.endSend,'')
-#                print 'receivedData:',receivedData               
-#                replyData = self._socketCommandRequest(receivedData)
-#                print "Reply:",replyData
-#                conn.sendall(replyData)
-#                receivedData = ''
-
-            if self.exitEvent.is_set():
-                break
-        conn.close()
         
-    def _socketCommandRequest(self,commandString):
         '''
-        Take the data received from the socket and decides what function needs to be called, 
-            which will gather the proper data
-        Inputs:
-            :commandString: - String received from the socket, example 'get Detector 1' -> 
-                                get the current settings for detector 1 The strings may 
-                                contain mulitple commans separated by a ','
+        self.getSocket()
+        while True:
+            
+            self.SOC.listen(1)
+            (conn,addr) = self.SOC.accept()
+            self._socketHandle(conn)
+            if self.exitEvent.isSet():
+                break
+        
+        
+    def _socketHandle(self,conn):
         '''
-        cmd = commandString.split(' ')[0]
-        print "Data:",commandString
-        if cmd in self.allowedRemoteInputSelect:
-            reply = self.commandInputs(commandString,remote=True)
-            return reply
-        else:
-            msg = "'%s' not allowed command from the remote interface."
-            return msg  
+        Main input for the user, feeds input to commandInputs() for completing tasks
+        '''  
+        
+        conn.settimeout(10.0) #set the timeout after the connection has been made
+        try:
+            while True:
+    
+                command = self._receiveCommandReply(conn)
+                if command == 'exit':
+                    self._releaseSocket()
+                    break
+                else:
+                    reply = self.commandInputs(command)
+                    return reply
+        except socket.timeout:
+            msg = "Socket Closed"
+            print msg
+        finally:
+            self._releaseSocket(conn)
         
 
 class bcolors:

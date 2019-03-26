@@ -37,23 +37,74 @@ class RemoteInterface(object):
         '''
         Get a hold of the socket that will be used to talk with the AutoFill control process
         '''
+#         print "Start!"
         self.SOC = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            self.SOC.settimeout(15.0)
             self.SOC.connect((self.HOST,self.PORT))
-            self.socketFile = self.SOC.makefile(mode='rw')
             return True
-        except Exception as E:
-            self.EventLog.warning('Failed to connect to socket, host %s | port %d'%(self.HOST,self.PORT))
-            self.EventLog.exception(E)
+        except Exception:
             print 'Socket Connection Failed'
-            return None
-        
+            return False
+    
     def _releaseSocket(self):
         '''
         Release the socket when the interface closes
         '''
-        self.socketFile.close()
+        
         self.SOC.close()
+    
+    def _sendCommand(self,commandString):
+        '''
+        Send the command entered by the user to the socketThread
+        :commandString: - String, input from the users
+        '''
+        writeSocketFile = self.SOC.makefile(mode='w')
+#         print "Writing:",commandString
+        writeSocketFile.write(commandString+'\n')
+        writeSocketFile.close()
+#         msg = "Sending '%s' through socket"%(commandString)
+#         print msg
+    
+    def _receiveCommandReply(self):
+        '''
+        Recieve reply from the sent command, 
+        '''
+        replyFile = self.SOC.makefile(mode='r')
+        reply = replyFile.readline()
+        replyFile.close()
+        formattedReply = reply.replace('|','\n')
+        return formattedReply
+    
+    def mainInput(self):
+        '''
+        Main input for the user, feeds input to commandInputs() for completing tasks
+        '''  
+        msg = 'Remote interface has started. Please enter the commands below.'
+        print msg
+#         self._printOKGreen(msg)      
+        success = self.getSocket()
+        if success == True:
+            try:
+                while True:
+                    print "got Socket!"
+                    answer = raw_input('>>')
+                    if answer == 'exit':
+                        self._sendCommand(answer)
+                        self._releaseSocket()
+                        break
+                    self._sendCommand(answer)
+                    reply = self._receiveCommandReply()
+                    print reply
+            except socket.error:
+                msg = "Socket Send failed, most likely a timeout on the receiver."
+                print msg
+            finally:
+                self._releaseSocket()
+        elif success == False:
+            msg = "Connection attempt failed"
+            print msg
+        
 
     def getLogs(self):
         '''
@@ -103,43 +154,7 @@ class RemoteInterface(object):
         '''
         print '\t'+bcolors.OKBLUE+okMsg+bcolors.ENDC
 
-    def _sendCommand(self,commandString):
-        '''
-        Send the command entered by the user to the socketThread
-        :commandString: - String, input from the users
-        '''
-        self.socketFile.write(commandString+self.endSend)
-        msg = "Sending '%s' through socket"%(commandString)
-        print msg
-        self.EventLog.debug(msg)
-
-    def _receiveCommandReply(self):
-        '''
-        Recieve reply from the sent command, 
-        '''
-        reply = ''
-        while True:
-            reply = self.socketFile.read()
-            print "reply:",reply
-            if self.endSend in reply:
-                break
-        return reply
-
-    def mainInput(self):
-        '''
-        Main input for the user, feeds input to commandInputs() for completing tasks
-        '''  
-        msg = 'Remote interface has started. Please enter the commands below.'
-        self._printOKGreen(msg)      
-        self.getSocket()
-        while True:
-            answer = raw_input('>>')
-            if answer == 'exit':
-                self._releaseSocket()
-                break
-            self.EventLog.debug('Entered command: %s'%answer)
-            self._sendCommand(answer)
-            print self._receiveCommandReply()
+    
             
 
 class bcolors:
