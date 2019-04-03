@@ -87,7 +87,8 @@ class RemoteInterface(object):
         if success == True:
             try:
                 while True:
-                    print "got Socket!"
+                    msg = "Remote socket is connected."
+                    self._printOKBlue(msg)
                     answer = raw_input('>>')
                     if answer == 'exit':
                         self._sendCommand(answer)
@@ -98,7 +99,7 @@ class RemoteInterface(object):
                     print reply
             except socket.error:
                 msg = "Socket Send failed, most likely a timeout on the receiver."
-                print msg
+                self._printError(msg)
             finally:
                 self._releaseSocket()
         elif success == False:

@@ -53,6 +53,7 @@ class AutoFillGUI():
                                'graph':self.graphInput,
                                'help':self.helpInput}
         self.allowedRemoteInputSelect=['get','temp','error','help']
+        self.SocketTimeout = 10.0
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
@@ -99,7 +100,7 @@ class AutoFillGUI():
             if i <= 2:    
                 sleep(3)
         
-    def checkThreadRunning(self):
+    def checkThreadRunning(self,remote=False):
         '''
         Check if the thread that does everything is running and notify the user if the thread is not
         running. Used in some of the input functions
@@ -107,7 +108,13 @@ class AutoFillGUI():
         status = self.interface.threadRunningCheck()
         if status == False:
             msg="Operation thread is not running, values read from detector will not be updated"
-            self._printWarning(msg)       
+            if remote == False:
+                self._printWarning(msg)       
+            elif remote == True:
+                return msg
+        elif status == True:
+            if remote == True:
+                return ''
 
     def initRelease(self):
         '''
@@ -322,7 +329,7 @@ class AutoFillGUI():
         :remote: - bool. If True the resulting string will be returned. If False the string will be printed
                     to the screen. 
         ''' 
-        self.checkThreadRunning()
+        warning = self.checkThreadRunning(remote)
         detectorNumbers = []
         if text == 'all':
             for num in self.detectorNumbers:
@@ -340,7 +347,7 @@ class AutoFillGUI():
             displayString += '\t%s (%s) temperature:'%(detector,name)+\
                             bcolors.OKGREEN+' %sC\n'%(temp)+bcolors.ENDC
         if remote == True:
-            return displayString
+            return warning+'\n'+displayString
         elif remote == False:        
             print displayString
     
@@ -440,8 +447,11 @@ class AutoFillGUI():
             inputFunction = self.inputSelectDict[command]
         except KeyError:
             msg = '"%s" not a valid command\n enter <help> to print help file' %(command)
-            self._printError(msg)
-            return msg
+            if remote == True:
+                return msg
+            elif remote == False:            
+                self._printError(msg)
+                return
         commandOptions = ' '.join(sText)
         reply = inputFunction(commandOptions,remote)
         return reply
@@ -554,28 +564,34 @@ class AutoFillGUI():
         self.SOC.bind((self.HOST,self.PORT))
         
     
-    def _releaseSocket(self,conn):
+    def _releaseSocket(self,conn=None):
         '''
         Release the socket when the interface closes
         '''
-        conn.shutdown(socket.SHUT_RDWR)
-        conn.close()
-#         self.SOC.close()
+        try:
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
+        except:
+            
+            print "Could not close Socket."
+            raise
+#        self.SOC.close()
     
-    def _sendCommand(self,conn,commandString):
+    def _sendReply(self,conn,replyString):
         '''
         Send the command entered by the user to the socketThread
         :commandString: - String, input from the users
         '''
         
         writeSocketFile = conn.makefile(mode='w')
-        cleanCommand = commandString.replace('\n','|')
-        writeSocketFile.write(cleanCommand+'\n')
+        cleanReply = replyString.replace('\n','|')
+        writeSocketFile.write(cleanReply+'\n')
         writeSocketFile.close()
-        msg = "Sending '%s' through socket"%(commandString)
-        print msg
+        msg = "Sending '%s' through socket"%(replyString)
+        self.EventLog.debug(msg)
+#        print msg
     
-    def _receiveCommandReply(self,conn):
+    def _receiveCommand(self,conn):
         '''
         Recieve reply from the sent command, 
         '''
@@ -587,37 +603,43 @@ class AutoFillGUI():
     
     def socketThread(self):
         '''
-        
+        Loop that keeps the socket looking for new connections and call the socketHandler if a connection is made
         '''
         self.getSocket()
-        self.SOC.listen(1)
         while True:
+#            self.SOC.settimeout(10)
+        
+            self.SOC.listen(1)
+#            self.SOC.settimeout(0) #turn off the timeout so it does not occur
             (conn,addr) = self.SOC.accept()
-            self._socketHandle(conn)
-            if self.exitEvent.isSet():
+            self._socketHandler(conn)
+            print "Socket Tread Timeout"
+            if self.exitEvent.is_set()==True:
+                self._releaseSocket(conn)
+                self.SOC.close() #close everything
                 break
         
-        
-    def _socketHandle(self,conn):
+    def _socketHandler(self,conn):
         '''
         Main input for the user, feeds input to commandInputs() for completing tasks
+        :conn: Socket Connection returned after the socket has accepted a connection
         '''  
         
-        conn.settimeout(10.0) #set the timeout after the connection has been made
+        conn.settimeout(self.SocketTimeout) #set the timeout after the connection has been made
         try:
             while True:
-    
-                command = self._receiveCommandReply(conn)
+                command = self._receiveCommand(conn)
                 if command == 'exit':
-                    self._releaseSocket()
+                    self._releaseSocket(conn)
                     break
                 else:
-                    reply = self.commandInputs(command)
-                    return reply
+                    reply = self.commandInputs(command,remote=True)
+                    self._sendReply(conn,reply)
         except socket.timeout:
             msg = "Socket Closed"
             print msg
         finally:
+            print "Finally Closed Socket:"
             self._releaseSocket(conn)
         
 
