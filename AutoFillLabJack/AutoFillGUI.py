@@ -385,20 +385,28 @@ class AutoFillGUI():
             elif remote == False:        
                 self._printError(errorString)
 
-    def _printWarning(self,warningMsg):
+    def _printWarning(self,warningMsg,remote=False):
         '''
         Print the error msg in yellow to make sure the operator sees it
         :warningMsg: - string that will be printed to the screen in the 
                         correct color
         '''
-        print '\t'+bcolors.WARNING+"Warning: "+warningMsg+bcolors.ENDC
+        warning ='\t'+bcolors.WARNING+"Warning: "+warningMsg+bcolors.ENDC 
+        if remote == True:
+            return warning
+        else if remote == False:
+            print warning
     
-    def _printError(self,errorMsg):
+    def _printError(self,errorMsg,remote=False):
         '''
         Print a fail to the scree, ie red
         :errorMsg: - string that will be printed to the screen in red
         '''
-        print '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
+        error = '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
+        if remote == True:
+            return error
+        else if remote == False:
+            print error
 
     def _printOKGreen(self,okMsg):
         '''
@@ -569,18 +577,38 @@ class AutoFillGUI():
 #         inputs = [server]
 #         outputs = []
 #         message_queues = {}
-    def _makeReply(self,cmd):
 
-        if cmd in self.allowedRemoteInput:
+    def _makeSocketReply(self,cmd):
+        '''
+        Check the given command is allowed from the remote interface
+        Get 
+        '''
+        sText = cmd.split(' ')
+        command = sText.pop(0) 
+        try:
+            self.inputSelectDict[command]
+        except KeyError:
+            reply = self._printError("%s not a valid command"%repr(cmd))
+            return reply #reply can be returned 
+        if command in self.allowedRemoteInput:
             reply = self.commandInputs(cmd,remote=True)
         else:
-            reply = "Command %s not allowed from remote interface"
-        cleanReply = reply.replace('\n','|')
-        return cleanReply
+            reply = self._printError("Command %s not allowed from remote interface"%repr(cmd))
+#        cleanReply = reply.replace('\n','|')
+        return reply
 
     def _cleanCmd(self,cmd):
-        return cmd.replace('\n','')       
-    
+        print "Command",repr(cmd)
+        return cmd.replace('\n','')
+       
+    def _formatReply(self,reply):
+        '''
+        Format the reply so the will be read by the other end of the socket 
+        ie remove returns so readline is not confused.
+        '''
+        formattedReply = reply.replace('\n','|')
+        return formattedReply
+
     def _releaseSocket(self,connectionQueue):
         '''
         Release the socket when the interface closes
@@ -596,6 +624,11 @@ class AutoFillGUI():
 #        self.SOC.close()
     
     def socketThread(self):
+        '''
+        Main thread for running the socket connection. Uses Select to check for connections reply to the
+        commands sent
+        '''
+        self.getSocket()
         inputs = [self.SOC]
         outputs = []
         message_queues = {}
@@ -611,7 +644,7 @@ class AutoFillGUI():
                     data = item.recv(1024)
                     if data:              
                         cleanData = self._cleanCmd(data)
-                        reply = self._makeReply(cleanData)
+                        reply = self._makeSocketReply(cleanData)
                         message_queues[item].put(reply+'\n') #add return to make sure receiver reads all the 
                         if item not in outputs:
                             outputs.append(item)

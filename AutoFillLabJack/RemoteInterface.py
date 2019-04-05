@@ -81,17 +81,18 @@ class RemoteInterface(object):
         Main input for the user, feeds input to commandInputs() for completing tasks
         '''  
         msg = 'Remote interface has started. Please enter the commands below.'
-        print msg
-#         self._printOKGreen(msg)      
+#        print msg
+        self._printOKGreen(msg)      
         success = self.getSocket()
         if success == True:
             try:
+                msg = "Remote socket is connected."
+                self._printOKBlue(msg)
                 while True:
-                    msg = "Remote socket is connected."
-                    self._printOKBlue(msg)
+                    
                     answer = raw_input('>>')
                     if answer == 'exit':
-                        self._sendCommand(answer)
+#                        self._sendCommand(answer)
                         self._releaseSocket()
                         break
                     self._sendCommand(answer)
