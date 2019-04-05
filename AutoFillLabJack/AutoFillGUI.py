@@ -12,6 +12,7 @@ from time import sleep
 #from threading import Event
 import logging.config
 import socket
+import select, Queue
 from labjack.ljm import LJMError
 
 
@@ -52,8 +53,9 @@ class AutoFillGUI():
                                'load':self.loadInput,
                                'graph':self.graphInput,
                                'help':self.helpInput}
-        self.allowedRemoteInputSelect=['get','temp','error','help']
+        self.allowedRemoteInput=['get','temp','error','help']
         self.SocketTimeout = 10.0
+        self.SocketCheckTimeout = 1.0
         self.hostname = socket.gethostname()
         if self.hostname == 'MMStrohmeier-S67':
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
@@ -562,85 +564,88 @@ class AutoFillGUI():
         '''
         self.SOC = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.SOC.bind((self.HOST,self.PORT))
-        
+        self.SOC.setblocking(0)
+        self.SOC.listen(1)
+#         inputs = [server]
+#         outputs = []
+#         message_queues = {}
+    def _makeReply(self,cmd):
+
+        if cmd in self.allowedRemoteInput:
+            reply = self.commandInputs(cmd,remote=True)
+        else:
+            reply = "Command %s not allowed from remote interface"
+        cleanReply = reply.replace('\n','|')
+        return cleanReply
+
+    def _cleanCmd(self,cmd):
+        return cmd.replace('\n','')       
     
-    def _releaseSocket(self,conn=None):
+    def _releaseSocket(self,connectionQueue):
         '''
         Release the socket when the interface closes
         '''
         try:
-            conn.shutdown(socket.SHUT_RDWR)
-            conn.close()
+            for conn in connectionQueue:
+                conn.shutdown(socket.SHUT_RDWR)
+                conn.close()
         except:
             
             print "Could not close Socket."
             raise
 #        self.SOC.close()
     
-    def _sendReply(self,conn,replyString):
-        '''
-        Send the command entered by the user to the socketThread
-        :commandString: - String, input from the users
-        '''
-        
-        writeSocketFile = conn.makefile(mode='w')
-        cleanReply = replyString.replace('\n','|')
-        writeSocketFile.write(cleanReply+'\n')
-        writeSocketFile.close()
-        msg = "Sending '%s' through socket"%(replyString)
-        self.EventLog.debug(msg)
-#        print msg
-    
-    def _receiveCommand(self,conn):
-        '''
-        Recieve reply from the sent command, 
-        '''
-        replyFile = conn.makefile(mode='r')
-        reply = replyFile.readline()
-        replyFile.close()
-        reply = reply.replace('\n','')
-        return reply
-    
     def socketThread(self):
-        '''
-        Loop that keeps the socket looking for new connections and call the socketHandler if a connection is made
-        '''
-        self.getSocket()
-        while True:
-#            self.SOC.settimeout(10)
+        inputs = [self.SOC]
+        outputs = []
+        message_queues = {}
+        while inputs:
+            readable, writable, exceptional = select.select(inputs, outputs, inputs,self.SocketCheckTimeout)
+            for item in readable:
+                if item is self.SOC:
+                    connection, client_address = item.accept()
+                    connection.setblocking(0)
+                    inputs.append(connection)
+                    message_queues[connection] = Queue.Queue()
+                else:
+                    data = item.recv(1024)
+                    if data:              
+                        cleanData = self._cleanCmd(data)
+                        reply = self._makeReply(cleanData)
+                        message_queues[item].put(reply+'\n') #add return to make sure receiver reads all the 
+                        if item not in outputs:
+                            outputs.append(item)
+                    else:
+                        if item in outputs:
+                            outputs.remove(item)
+                        inputs.remove(item)
+                        item.close()
+                        del message_queues[item]
+                        
+            for item in writable:
+                try:
+                    next_msg = message_queues[item].get_nowait()
+                except Queue.Empty:
+                    outputs.remove(item)
+                else:
+                    print "Sending:",next_msg
+                    item.send(next_msg)
         
-            self.SOC.listen(1)
-#            self.SOC.settimeout(0) #turn off the timeout so it does not occur
-            (conn,addr) = self.SOC.accept()
-            self._socketHandler(conn)
-            print "Socket Tread Timeout"
-            if self.exitEvent.is_set()==True:
-                self._releaseSocket(conn)
-                self.SOC.close() #close everything
+            for item in exceptional:
+                inputs.remove(item)
+                if item in outputs:
+                    outputs.remove(item)
+                item.close()
+                del message_queues[item]
+            
+            if self.exitEvent.is_set():
+                self._releaseSocket(message_queues)
                 break
         
-    def _socketHandler(self,conn):
-        '''
-        Main input for the user, feeds input to commandInputs() for completing tasks
-        :conn: Socket Connection returned after the socket has accepted a connection
-        '''  
+    
+    
         
-        conn.settimeout(self.SocketTimeout) #set the timeout after the connection has been made
-        try:
-            while True:
-                command = self._receiveCommand(conn)
-                if command == 'exit':
-                    self._releaseSocket(conn)
-                    break
-                else:
-                    reply = self.commandInputs(command,remote=True)
-                    self._sendReply(conn,reply)
-        except socket.timeout:
-            msg = "Socket Closed"
-            print msg
-        finally:
-            print "Finally Closed Socket:"
-            self._releaseSocket(conn)
+    
         
 
 class bcolors:

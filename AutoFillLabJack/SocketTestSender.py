@@ -5,6 +5,7 @@ Created on Aug 22, 2017
 '''
 import socket
 
+
 '''
 Test send portion of the autofill stuff, this would be the process that gets data from the autofill process
 '''
@@ -69,22 +70,22 @@ class SocketTestSender():
 #         self._printOKGreen(msg)      
         success = self.getSocket()
         if success == True:
-            try:
-                while True:
-                    print "got Socket!"
-                    answer = raw_input('>>')
-                    if answer == 'exit':
-                        self._sendCommand(answer)
-                        self._releaseSocket()
-                        break
-                    self._sendCommand(answer)
-                    reply = self._receiveCommandReply()
-                    print reply
-            except socket.error:
-                msg = "Socket Send failed, most likely a timeout on the receiver."
-                print msg
-            finally:
-                self._releaseSocket()
+#             try:
+            while True:
+                print "got Socket!"
+                answer = raw_input('>>')
+                if answer == 'exit':
+#                     self._sendCommand(answer)
+                    self._releaseSocket()
+                    break
+                self._sendCommand(answer)
+                reply = self._receiveCommandReply()
+                print "Received:",reply
+#             except socket.error:
+#                 msg = "Socket Send failed, most likely a timeout on the receiver."
+#                 print msg
+#             finally:
+#                 self._releaseSocket()
         elif success == False:
             msg = "Connection attempt failed"
             print msg
