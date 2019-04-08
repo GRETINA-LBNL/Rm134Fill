@@ -107,9 +107,9 @@ class AutoFillInterface():
             self.initReleaseEvent.set()
             threads = threading.enumerate()
             for thread in threads: #Stop the thread that runs the communication socket
-                if thread.name == 'SocketThread':
+                print 
+                if thread.name == self.mainThreadName:
                     thread.join()
-
             self.LJ.releaseInitFlash()
             self.LJ.releaseInit()
             msg = "Proper LJ Shutdown Succeeded"

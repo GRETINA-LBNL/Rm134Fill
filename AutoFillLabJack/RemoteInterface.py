@@ -73,7 +73,10 @@ class RemoteInterface(object):
         replyFile = self.SOC.makefile(mode='r')
         reply = replyFile.readline()
         replyFile.close()
-        formattedReply = reply.replace('|','\n')
+        if reply == '':
+            formattedReply = "No data was returned"
+        else:
+            formattedReply = reply.replace('|','\n')
         return formattedReply
     
     def mainInput(self):

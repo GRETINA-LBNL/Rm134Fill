@@ -394,7 +394,7 @@ class AutoFillGUI():
         warning ='\t'+bcolors.WARNING+"Warning: "+warningMsg+bcolors.ENDC 
         if remote == True:
             return warning
-        else if remote == False:
+        elif remote == False:
             print warning
     
     def _printError(self,errorMsg,remote=False):
@@ -405,7 +405,7 @@ class AutoFillGUI():
         error = '\t'+bcolors.FAIL+errorMsg+bcolors.ENDC
         if remote == True:
             return error
-        else if remote == False:
+        elif remote == False:
             print error
 
     def _printOKGreen(self,okMsg):
@@ -498,6 +498,7 @@ class AutoFillGUI():
         :text: - not used, needed to make it common
         :remote: - String, not used, needed to be common with other Input functions
         '''
+        
         self.interface.initRelease()
         del self.interface
         self.EventLog.info('Exiting Auto Fill Program')
@@ -515,7 +516,12 @@ class AutoFillGUI():
         elif text == '':
             fileName = self.MiniHelpFile
         with open(fileName, 'r') as helpFile:
-            print helpFile.read()
+            fileContentsList = helpFile.readlines()
+        fileContents = ''.join(fileContentsList)
+        if remote == True:
+            return fileContents
+        elif remote == False:
+            print fileContents
         
 #         print 'HELP!'
         
@@ -588,17 +594,16 @@ class AutoFillGUI():
         try:
             self.inputSelectDict[command]
         except KeyError:
-            reply = self._printError("%s not a valid command"%repr(cmd))
+            reply = self._printError("%s not a valid command"%repr(cmd),remote=True)
             return reply #reply can be returned 
         if command in self.allowedRemoteInput:
             reply = self.commandInputs(cmd,remote=True)
         else:
-            reply = self._printError("Command %s not allowed from remote interface"%repr(cmd))
-#        cleanReply = reply.replace('\n','|')
+            reply = self._printError("Command %s not allowed from remote interface"%repr(cmd),remote=True)
         return reply
 
     def _cleanCmd(self,cmd):
-        print "Command",repr(cmd)
+#        print "Command",repr(cmd)
         return cmd.replace('\n','')
        
     def _formatReply(self,reply):
@@ -607,6 +612,7 @@ class AutoFillGUI():
         ie remove returns so readline is not confused.
         '''
         formattedReply = reply.replace('\n','|')
+        formattedReply = formattedReply.replace('\r','')
         return formattedReply
 
     def _releaseSocket(self,connectionQueue):
@@ -618,7 +624,6 @@ class AutoFillGUI():
                 conn.shutdown(socket.SHUT_RDWR)
                 conn.close()
         except:
-            
             print "Could not close Socket."
             raise
 #        self.SOC.close()
@@ -645,7 +650,8 @@ class AutoFillGUI():
                     if data:              
                         cleanData = self._cleanCmd(data)
                         reply = self._makeSocketReply(cleanData)
-                        message_queues[item].put(reply+'\n') #add return to make sure receiver reads all the 
+                        formattedReply = self._formatReply(reply)
+                        message_queues[item].put(formattedReply+'\n') #add return to make sure receiver reads all the 
                         if item not in outputs:
                             outputs.append(item)
                     else:
@@ -661,7 +667,7 @@ class AutoFillGUI():
                 except Queue.Empty:
                     outputs.remove(item)
                 else:
-                    print "Sending:",next_msg
+#                    print "Sending:",next_msg
                     item.send(next_msg)
         
             for item in exceptional:
@@ -670,8 +676,8 @@ class AutoFillGUI():
                     outputs.remove(item)
                 item.close()
                 del message_queues[item]
-            
-            if self.exitEvent.is_set():
+#            print "Timeout!","Exit Event:",self.exitEvent.is_set()
+            if self.exitEvent.is_set() == True:
                 self._releaseSocket(message_queues)
                 break
         
