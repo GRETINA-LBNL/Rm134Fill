@@ -238,22 +238,20 @@ class AutoFillGUI():
         '''
         if nameText == 'chill':
             returnName = 'Line Chill'
+            msg = ''
         else:
             if nameText in self.detectorNumbers:
-                detectorNumber = nameText
-                
+                returnName ='Detector %s'%nameText
+                msg = ''
             else:
                 try:
                     detectorNumber = self.detectorNamesDict[nameText]
-                    
+                    returnName = 'Detector %s'%detectorNumber
+                    msg = ''
                 except KeyError:
-                    detectors = ''
+                    returnName = False
                     msg = '"%s" not a valid detector number or name'%(nameText)
-                    self._printError(msg)
-                    return False
-            returnName = 'Detector %s'%detectorNumber   
- 
-        return returnName
+        return returnName,msg
     
 #    def _checkValidName(self, possibleName):
 #        '''
@@ -313,9 +311,12 @@ class AutoFillGUI():
             detectors = [text] 
 
         for number in detectors:
-            detectorName = self._detectorNameConversion(number)
+            detectorName,msg = self._detectorNameConversion(number)
             if detectorName == False: #if the name conversion fails exit the function
-                return False
+                if remote == True:
+                    return msg
+                elif detectorName == False:
+                    return False
             displayString = self.interface.readDetectorConfig(detectorName)          
             if remote == True:
                 return displayString
@@ -335,13 +336,18 @@ class AutoFillGUI():
         detectorNumbers = []
         if text == 'all':
             for num in self.detectorNumbers:
-                detectorNumbers.append(self._detectorNameConversion(num))
+                detectorName,msg = self._detectorNameConversion(num)
+                detectorNumbers.append(detectorName)
         else:
-            detectorNumber = self._detectorNameConversion(text)
-            detectorNumbers.append(detectorNumber)
+            detectorName,msg = self._detectorNameConversion(text)
+            detectorNumbers.append(detectorName)
 
-        if False in detectorNumbers:
-            return False
+        if False in detectorNumbers: #if the name conversion fails handle the returned error
+            if remote == True:
+                return msg
+            elif remote == False:
+                self._errorPrint(msg)
+                return False
         
         temps,names = self.interface.getDetectorTemps(detectorNumbers)
         displayString = ''
