@@ -52,8 +52,9 @@ class AutoFillGUI():
                                'write':self.writeSettingsInput,
                                'load':self.loadInput,
                                'graph':self.graphInput,
-                               'help':self.helpInput}
-        self.allowedRemoteInput=['get','temp','error','help']
+                               'help':self.helpInput,
+                               'status':self.statusInput}
+        self.allowedRemoteInput=['get','temp','error','help','status']
         self.SocketTimeout = 10.0
         self.SocketCheckTimeout = 1.0
         self.hostname = socket.gethostname()
@@ -142,7 +143,7 @@ class AutoFillGUI():
         :remote: - not used. Needed to be consistant with the other input functions
         '''
         sptext = text.split(' ')
-        detector = self._detectorNameConversion(sptext[0])
+        detector,msg = self._detectorNameConversion(sptext[0])
         if detector == False: #if the conversion fails don't do anyting
             return False
         if detector == 'Line Chill':
@@ -316,6 +317,7 @@ class AutoFillGUI():
                 if remote == True:
                     return msg
                 elif detectorName == False:
+                    self._printError(msg)
                     return False
             displayString = self.interface.readDetectorConfig(detectorName)          
             if remote == True:
@@ -346,7 +348,7 @@ class AutoFillGUI():
             if remote == True:
                 return msg
             elif remote == False:
-                self._errorPrint(msg)
+                self._printError(msg)
                 return False
         
         temps,names = self.interface.getDetectorTemps(detectorNumbers)
@@ -359,10 +361,11 @@ class AutoFillGUI():
         elif remote == False:        
             print displayString
     
-    def writeSettingsInput(self,text):
+    def writeSettingsInput(self,text,remote=False):
         '''
         Write the settings that the user entered using the setDetectorSettingsInput method
         :text: - not used, needed to make the function match the others
+        :remote: - not used, needed to make the function match the other input functions
         '''
         detectors,settings,values = self.checkDetectorChanges()
 #         print 'Detectors',detectors
@@ -537,8 +540,9 @@ class AutoFillGUI():
         :text: - string, number of detector to produce graph for
         :remote: - Not used. Needed to be consistant with all input functions
         '''
-        detectorNumbers = self._detectorNameConversion(text)
+        detectorNumbers,msg = self._detectorNameConversion(text)
         if detectorNumbers == False:
+            self._printError(msg)
             return False
         else:
             self.interface.graphDetectorTemp(detectorNumbers)
@@ -552,7 +556,25 @@ class AutoFillGUI():
         msgStr = self.interface.loadDetectorConfig()
         if msgStr != '':
             self._printWarning(msgStr)
-            
+
+    def statusInput(self,text,remote):
+        '''
+        Give the current status of the control thread, ie if it's running or not
+        :text: - not used, need to match other input functions
+        :remote: - bool, indicates if the request is comming from the remote interface
+        '''      
+        status = self.interface.threadRunningCheck()
+        if status == True:
+            msg = "Main thread is running."
+        elif status == False:
+            msg = "Main thread is not running."
+        #add check for current valves open
+        #add report for next fill to start
+        if remote == True:
+            return msg
+        elif remote == False:
+            self._printOKGreen(msg)            
+
     def mainInput(self):
         '''
         Main input for the user, feeds input to commandInputs() for completing tasks

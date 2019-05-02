@@ -26,7 +26,7 @@ Entering Dector Settings to Change
                                     use a comma to seperate times '12:01,13:45'
 					maximum		- minutes, intiger 1-60
 					minimum		- minutes, intiger 1-60
-					temp		- degrees K, intiger 1-400
+					temp		- degrees C, intiger -200-100
 					name		- string, no spaces
 		Example - set 1 enabled True -> Enables automatic filling of detector 1
 				- set 3 timeout 4 -> sets detector 3 Maximun Fill Time to 4 minutes
