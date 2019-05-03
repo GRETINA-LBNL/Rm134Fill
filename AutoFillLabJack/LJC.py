@@ -156,7 +156,7 @@ class LJC(object):
             names.append(self.valveTempDict[detector]) #build the list of port names for the requested temperature
         names_readA = map(lambda x: x+'_EF_READ_A', names) #adjust the name to read with the EF options
         self.EventLog.debug('Reading vent temperatures from %s'%repr(names_readA))
-        stringTemps = self._LJReadValues(names_readA) #return the values
+        stringTemps = self._LJReadWrite(names_readA) #return the values
         return stringTemps
 #         return map(lambda x: float(x),stringTemps) #conver to list of floats
         
@@ -170,7 +170,7 @@ class LJC(object):
             names.append(self.detectorTempDict[detector]) #build the list of port names for the requested temperature
         names_readA = map(lambda x: x+'_EF_READ_A', names) #adjust the name to read with the EF options
         self.EventLog.debug('Reading detector temps from %s.'%repr(names))
-        return self._LJReadValues(names_readA) #return the values
+        return self._LJReadWrite(names_readA) #return the values
             
     def writeValveStates(self,detectorList, valveStates):
         '''
@@ -187,7 +187,7 @@ class LJC(object):
             elif value == False:
                 values.append(0)
         self.EventLog.debug('Writing fill valve states %s to %s'%(values,names))
-        return self._LJWriteValues(names,values) #return the values  
+        return self._LJReadWrite(names,values) #return the values  
     
     def writeEnableLEDState(self,detectorList,ledStates):
         '''
@@ -207,7 +207,7 @@ class LJC(object):
                 msg="Not A Valid Option"
                 print repr(value), msg
         self.EventLog.debug('Writing %s to enable leds for %s'%(values,names))
-        return self._LJWriteValues(names,values) #return the values  
+        return self._LJReadWrite(names,values) #return the values  
     
     def writeErrorState(self,state):
         '''
@@ -296,14 +296,14 @@ class LJC(object):
             value = 1
         elif state == False:
             value = 0
-        self._LJWriteValues([name], [value])
+        self._LJReadWrite([name], [value])
                              
     def _LJReadSingleState(self,name):
         '''
         Read a single value from a digital input, convert it to bool
         :name: - string name of input to read
         '''           
-        value = self._LJReadValue(name)
+        value = self._LJReadWrite(name)
         if value == 0:
             state = False
         elif value == 1:
@@ -332,7 +332,7 @@ class LJC(object):
                     return returnValues
                 else:
                     if type(names) == type([]):
-                        returnValue = self._LJWriteValues(names,values)
+                        returnValue = self._LJReadWrite(names,values)
                     else:
                         msg = "Failed, %s not a vlid type for writing"%type(names)
                         returnValue = msg
