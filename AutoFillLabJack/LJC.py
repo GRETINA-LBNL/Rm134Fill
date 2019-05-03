@@ -7,6 +7,7 @@ from labjack import ljm
 from labjack.ljm import LJMError
 from time import sleep
 import logging
+import time
 
 # from multiprocessing.managers import State
 # from ConfigParser import RawConfigParser
@@ -283,8 +284,8 @@ class LJC(object):
             return msg #the error will be handled by the Interface
 #             raise LJMError(errorString=msg)
         elif value == True:
-            return ''
-        
+            return '' 
+   
     def _LJWriteSingleState(self,name,state):
         '''
         Write a single value to the 
@@ -308,42 +309,65 @@ class LJC(object):
         elif value == 1:
             state = True
         return state
-    
+
+    def _LJReadWrite(self,names,values=None):
+        '''
+        Read or Write the given names and values from the LabJack
+        :names: - list of names or single name to read or write 
+        :values: - list of values or single value to write, if not given the function will read and return the values
+        
+        '''
+        tries = 0
+        while tries < 2:
+            try:
+                if values == None:
+                    if type(names) == type([]):
+                        returnValues = self._LJReadValues(names)
+                    elif type(names) == type(""):
+                        returnValues = self._LJReadValue(names)
+                    else:
+                        msg = "%s not a valid type for _LJReadWrite"%(type(names))
+                        returnValues = msg
+                    tries = 4
+                    return returnValues
+                else:
+                    if type(names) == type([]):
+                        returnValue = self._LJWriteValues(names,values)
+                    else:
+                        msg = "Failed, %s not a vlid type for writing"%type(names)
+                        returnValue = msg
+                    tries = 4
+                    return returnValue
+            except LJMError as LJError:
+                tries += 1
+                time.sleep(1)#sleep the thread before trying to talk with the LabJack again
+                
+        if tries == 2:
+            raise LJError
+            
+
     def _LJWriteValues(self,names,values):
         '''
         :names: - list of LJ channels names to write to
         :values: -list of values to write to the channels
         '''
         numFrames = len(names)
-#         self.EventLog.debug()
-        try:
-            ljm.eWriteNames(self.controller, numFrames, names, values)
-        except LJMError:
-            msg = 'Failed in setting %s to values %s'%(names,values)
-            print msg
-#         print 'E',errorAddress
-#         if not errorAddress:
-#             msg = 'Problem with writing to address %f'%errorAddress
-#             print msg
-#             return None
-#         return True
+        ljm.eWriteNames(self.controller, numFrames, names, values)
     
     def _LJReadValues(self,names):
         '''
         :names: - list of LJ channels names to read from
         '''
         numFrames = len(names)
-#         returnValues = [float]*numFrames
         values = ljm.eReadNames(self.controller, numFrames,names)
-#         if not errorAddress:
-#             msg = 'Problem with reading data from address %f'
-#             print msg
-#             return None
-#         else:
         return values
     
     def _LJReadValue(self,name):
-        value = ljm.eReadName(self.controller,name)
+        '''
+        read a single value from the LabJack
+        :name: - string, name of channel to read
+        '''
+        value = ljm.eReadName(self.controller,name)     
         return value
     
     
