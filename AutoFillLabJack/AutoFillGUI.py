@@ -286,7 +286,7 @@ class AutoFillGUI():
         errorString = self.interface.checkValidConfiguration(settingsDict,enabledDetectors)
         if errorString:
             msg = '\n\tPlease amend the fill schedule to fix the conflicts.'
-            msg2 = "\n\tThe detector configuration will not be updated."
+            msg2 = "\n\tThe filling configuration will not be updated."
             self._printWarning(errorString+msg+msg2)
             return [],[],[]
         return detectors,settings,values
