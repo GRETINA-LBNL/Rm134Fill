@@ -317,33 +317,35 @@ class LJC(object):
         :values: - list of values or single value to write, if not given the function will read and return the values
         
         '''
-        tries = 0
-        while tries < 2:
-            try:
-                if values == None:
-                    if type(names) == type([]):
-                        returnValues = self._LJReadValues(names)
-                    elif type(names) == type(""):
-                        returnValues = self._LJReadValue(names)
-                    else:
-                        msg = "%s not a valid type for _LJReadWrite"%(type(names))
-                        returnValues = msg
-                    tries = 4
-                    return returnValues
-                else:
-                    if type(names) == type([]):
-                        returnValue = self._LJReadWrite(names,values)
-                    else:
-                        msg = "Failed, %s not a vlid type for writing"%type(names)
-                        returnValue = msg
-                    tries = 4
-                    return returnValue
-            except LJMError as LJError:
-                tries += 1
-                time.sleep(1)#sleep the thread before trying to talk with the LabJack again
+#        tries = 0
+#        while tries < 2:
+#        try:
+        if values == None:
+            if type(names) == type([]):
+                returnValues = self._LJReadValues(names)
+            elif type(names) == type(""):
+                returnValues = self._LJReadValue(names)
+            else:
+                msg = "%s not a valid type for _LJReadWrite"%(type(names))
+                returnValues = msg
+#                tries = 4
+            return returnValues
+        else:
+            if type(names) == type([]):
+                returnValue = self._LJWriteValues(names,values)
+            else:
+                msg = "Failed, %s not a vlid type for writing"%type(names)
+                returnValue = msg
+#                tries = 4
+            return returnValue
+#        except LJMError as LJError:
+            
+#            tries += 1
+#            print "Failed to read/write, try# %d"%tries
+#            time.sleep(1)#sleep the thread before trying to talk with the LabJack again
                 
-        if tries == 2:
-            raise LJError
+#        if tries == 2:
+#            raise LJError
             
 
     def _LJWriteValues(self,names,values):

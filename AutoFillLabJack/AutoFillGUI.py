@@ -278,15 +278,17 @@ class AutoFillGUI():
     def checkDetectorChanges(self):
         '''
         Show the user what changes they have entered
+        Check the changes made are valid
         '''
         detectors,settings,values,returnString = self.interface.collectDetectorSettings()
         print '\n'+returnString
-        errorList = []
         settingsDict,enabledDetectors = self.interface.constructSettingsDict(detectors, settings, values)
         errorString = self.interface.checkValidConfiguration(settingsDict,enabledDetectors)
         if errorString:
             msg = '\n\tPlease amend the fill schedule to fix the conflicts.'
-            self._printWarning(errorString+msg)
+            msg2 = "\n\tThe detector configuration will not be updated."
+            self._printWarning(errorString+msg+msg2)
+            return [],[],[]
         return detectors,settings,values
     
     def writeDetectorChanges(self,detectors,settings,values):
@@ -368,9 +370,8 @@ class AutoFillGUI():
         :remote: - not used, needed to make the function match the other input functions
         '''
         detectors,settings,values = self.checkDetectorChanges()
-#         print 'Detectors',detectors
-#         print 'Settings', settings
-#         print 'Values', values
+        if not detectors: #invalid configuration will return empty lists
+            return
         answer = raw_input('Write the settings show above(Y/n)?')
         if answer.upper() == 'Y':
             self.writeDetectorChanges(detectors,settings,values)
@@ -568,11 +569,12 @@ class AutoFillGUI():
             msg = "Main thread is running."
         elif status == False:
             msg = "Main thread is not running."
-        #add check for current valves open
+        valveStatus = self.interface.getValveStatus()
         #add report for next fill to start
         if remote == True:
-            return msg
+            return msg+valveStatus
         elif remote == False:
+            print valveStatus
             self._printOKGreen(msg)            
 
     def mainInput(self):

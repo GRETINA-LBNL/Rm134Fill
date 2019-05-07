@@ -170,6 +170,22 @@ class AutoFillInterface():
         self.configDictLock.release()
         return temps,names
     
+    def getValveStatus(self):
+        '''
+        Get the current status of all the valves, return string showing which valves are open
+        '''
+        self.valuesDictLock.acquire()   
+        openValves = []
+        for detector in self.detectorValuesDict.iterkeys():
+            if self.detectorValuesDict[detector]["Valve State"] == True:
+                openValves.append(detector)
+        self.valuesDictLock.release()
+        if not openValves:
+            valveList = 'None'
+        else:        
+            valveList = ','.join(openValves)
+        return "\tFill Valve(s) currently open: "+bcolors.OKGREEN+valveList+bcolors.ENDC
+            
     def readVentTemps(self):
         '''
         :detectors: list of detector names (strings) to read the valve temperature
@@ -355,6 +371,8 @@ class AutoFillInterface():
         Check the enabled detectors to see if there temperatures exceed the Maximum temp limits 
         
         '''  
+        self.configDictLock.acquire()
+        self.valuesDictLock.acquire()
         for detector in self.enabledDetectors:
             maxTemp = float(self.detectorConfigDict[detector]['Detector Max Temperature'])
             curTemp = float(self.detectorValuesDict[detector]['Detector Temperature'])
@@ -363,7 +381,8 @@ class AutoFillInterface():
                 msg = '%s (%s) temperature has exceeded its max allowed temperature'%(detector,name)
                 self.errorList.append(msg)
                 self.EventLog.info(msg)
-               
+        self.configDictLock.release()
+        self.valuesDictLock.release()               
         
     def checkStartDetectorFills(self):
         '''
@@ -626,6 +645,7 @@ class AutoFillInterface():
             self.fillInhibitEvent.set()
         else:
 #             if self.fillInhibitEvent.isSet() == True:
+            self.inihibitFills = state
             self.fillInhibitEvent.clear()
 #             self.LJ.writeInhibitState(state)
         
