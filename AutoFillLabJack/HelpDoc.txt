@@ -3,7 +3,7 @@ Entering Dector Settings to Change
 	set <num/name> <option> <value> - set detector option to value
 		This command does not change the current detector settings. The options and values entered are stored
 		until the user enters "write settings". Then the detector settings are updated.
-		<num/name> - detector number 1-6, detector name or chill
+		<num/name> - detector number 1-6, detector name given in its configuration or chill
 		<option> - detector setting that will be changed
 					Short Hand  - Full Name 
 					enabled 	- Fill Enabled 			> enable/disable nitrogen filling for detector
@@ -41,13 +41,13 @@ Load the Detector Configuration file
 					used when the user directly edits the configuration file and wants to load the new settings
 	
 Displaying Current Settings
-	get <num> - print the current settings for the entered detector number
-		<num> - Detector number to print current settings, 1-6, chill, all 
+	get <num/name> - print the current settings for the entered detector
+		<num/name> - Detector number or name of detector. Valid numbers are 1-6, valid names are taken from the name option of the detector's configuraion
 		Example	- get 2 -> display all the current settings for detector 2
 
 Display Current Detector Temperatures
 	temp <num/name> - prints the detector temperature to screen
-		<num/name> - detector channel number 1-6, detector name, or 'all' can also be used and
+		<num/name> - detector channel number 1-6, detector name taken from detector configuration, or 'all' can also be used and
                          all temperatures will be displayed
 		Example - temp all -> print all the current detector temperatures
 				- temp 2 -> print the current temperatrue of detector 2
@@ -55,13 +55,16 @@ Display Current Detector Temperatures
 
 Display Graph of Recorded Detector Temperature
 	graph <num/name> - shows a graph of the detector temperatures stored in the temperature log
-		<num/name> - detector channel number 1-6 or detector name
+		<num/name> - detector channel number 1-6 or detector name taken from detector configuration
 
 Display and Clear Errors	
 	error - print the error
 	error clear - clear any errors that are currently active, if error coinditions still exists 
                     the specific error will continue to report
-		
+
+Display the Status of the Auto Fill System
+    status - print the current status of the auto fill system.
+    		
 Stop Filling Program
 	stop - safely turns off the filling thread, closing valves and turning off all lights. 
             Command line interface will still be running

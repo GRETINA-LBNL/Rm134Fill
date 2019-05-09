@@ -30,6 +30,8 @@ error - display the currently set errors
 --
 error clear - clear the currently set errors
 --
+status - print the current status of the autofill system. A list of currently open valves and the state of the main control thread.
+--
 start - start the filling operation
 --
 stop - stop the filling operation, open valves are closed
