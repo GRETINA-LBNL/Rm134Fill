@@ -2,23 +2,27 @@
 get <num/name> - get current detector settings
     'all' is a valid number
 --
-set <num/name> <option> <value> - set detector <num> <option> to <value>
+set <num/name> <option> <value> - set the given detector option to the given value
     'write' command needed to write settings entered by set command
-    <options>
-    enabled		- True/False
-    schedule	- 24 hour time (HH:MM), comma sperates fill times '12:01,13:45'
-    maximum		- minutes, intiger 1-60
-    minimum		- minutes, intiger 1-60
-    temp		- degrees C, intiger -100-100
-    logging     - True/False
-    name		- string
+    <num/name>
+        detector name or number, valid numbers are 1-6. Detector names are taken from name option in configuration
+    <option>
+        enabled		- True/False
+        schedule	- 24 hour time (HH:MM), comma sperates fill times '12:01,13:45'
+        maximum		- minutes, intiger 1-60
+        minimum		- minutes, intiger 1-60
+        temp		- degrees C, intiger -100-100
+        logging     - True/False
+        name		- string
 --
 write - writes entered settings to auto fill configuration
 --
-temp <num> - displays current detector temp,
+temp <num/name> - displays current detector temp,
+    <num/name> - detector name or number, valid numbers are 1-6. Detector names are taken from name option in configuration
 	'all' is a valid number
 --
-graph <num> - displays temperatures stored in the current temperature log
+graph <num/name> - displays temperatures stored in the current temperature log
+    <num/name> - valid numbers are 1-6. Detector names are taken from name option in configuration
 --
 load - load the config file, generally after changes have been made to the file
 --
