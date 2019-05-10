@@ -388,12 +388,14 @@ class AutoFillGUI():
         if text == 'clear':
             self.interface.cleanErrorDict()
             self.EventLog.info('Cleaning error log')
+            returnString = "Errors have been cleaned"
         else:
-            errorString = self.interface.readDetectorErrors()
-            if remote == True:
-                return errorString
-            elif remote == False:        
-                self._printError(errorString)
+            returnString = self.interface.readDetectorErrors()
+
+        if remote == True:
+            return returnString
+        elif remote == False:        
+            self._printError(returnString)
 
     def _printWarning(self,warningMsg,remote=False):
         '''

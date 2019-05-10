@@ -61,10 +61,10 @@ class AutoFillInterface():
         self.loggingTimeFormat = '%b-%d-%Y %H:%M:%S '
         self.ventCloseThresholdTemp = -230 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
-        self.errorRepeatLimit = 2 #number of times the error needs to show before it is emaild
-        self.errorEmailRepeatLimit = 3 #number of error has crosses errorRepeatLimit before getting emailed again
-        self.emailRecipents = 'gretianfilling@gmail.com'
-        self.senderEmail    = 'gretianfilling@gmail.com'
+        self.errorRepeatLimit = 30 #number of times the error needs to show before it is emaild
+        self.errorEmailRepeatLimit = 8 #number of error has crosses errorRepeatLimit before getting emailed again
+        self.emailRecipents = 'ADonoghue@lbl.gov'
+        self.senderEmail    = 'gretinafilling@gmail.com'
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
         self.mainThreadName = 'MainControlThread'
         self.valuesDictLock = threading.Lock()
@@ -107,7 +107,7 @@ class AutoFillInterface():
             self.initReleaseEvent.set()
             threads = threading.enumerate()
             for thread in threads: #Stop the thread that runs the communication socket
-                print 
+#                print 
                 if thread.name == self.mainThreadName:
                     thread.join()
             self.LJ.releaseInitFlash()
@@ -215,6 +215,8 @@ class AutoFillInterface():
         '''
         Load the data from the configuration file for each detector
         '''
+        self.valuesDictLock.acquire()
+        self.configDictLock.acquire()
         self.EventLog.info('Load Detector Configuration from %s'%self.detectorConfigFile)
         cnfgFile = ConfigParser.RawConfigParser()
         cnfgFile.read(self.detectorConfigFile)
@@ -245,12 +247,16 @@ class AutoFillInterface():
                     self.loggingDetectors.append(detector)
                 self.detectorNamesDict[self.detectorConfigDict[detector]["Name"]] = detector.split(' ')[1]
                 #Just get the detector number, 'Detector' will be added inthe GUI
+                
         lineChillEnabled = cnfgFile.get('Line Chill','Fill Enabled')
         if lineChillEnabled == 'True' or lineChillEnabled == 'False':
             self.lineChillEnabled = lineChillEnabled
         
         self.lineChillTimeout = float(cnfgFile.get('Line Chill','Maximum Fill Time'))  
+        self.valuesDictLock.release()
+        self.configDictLock.release()
         errorMsgLst = self.checkValidConfiguration(self.detectorConfigDict,self.enabledDetectors)
+        
         return errorMsgLst
        
     def applyDetectorConfig(self):
@@ -521,19 +527,27 @@ class AutoFillInterface():
             return ''
 #             self.errorDict = {}
 #             self.LJ.writeErrorState(False)
-        errorDict = {} #rewrite the error dict each time to make sure errors do not get counted mulitple times
+        errorDict = {} #rewrite the error dict each time to make sure errors do not get counted mulitple times        
         for error in self.errorList:
             try:
                 errorDict[error] += 1
+#                print error,': ',errorDict[error]
             except KeyError:
                 errorDict[error] = 1
-        self.errorDict = errorDict
+        
         emailBody = ''
+        
         for (error, numRepeat) in self.errorDict.iteritems():
+#            print "Construct ",error,": ",numRepeat
             if numRepeat >= self.errorRepeatLimit:
                 emailBody += ',%s'%error
+                errorDict[error] = 0 #reset the error counter 
+                self.errorList = filter(lambda x: x != error, self.errorList) 
+                                #remove the errors that have been reported
+                               
             else:
                 continue
+        self.errorDict = errorDict        
         return emailBody
     
     def readDetectorErrors(self):
@@ -557,7 +571,8 @@ class AutoFillInterface():
         :detectors: - list of detectors to clean up
         
         '''
-    
+        self.valuesDictLock.acquire()
+        self.EventLog.debug("Cleaning detector values dictionary")
         for detector in detectors:
             if 'Line Chill' == detector:
                 continue
@@ -566,6 +581,7 @@ class AutoFillInterface():
                 self.detectorValuesDict[detector]['Minimum Fill Experied'] = False
                 self.detectorValuesDict[detector]['Maximum Fill Time'] = '0'
                 self.detectorValuesDict[detector]['Fill Started Time'] = '0:0'
+        self.valuesDictLock.release()
             
     def cleanErrorDict(self):
         '''
@@ -588,6 +604,7 @@ class AutoFillInterface():
         for error in validErrors.split(','):
             try:
                 errorCount = self.errorEmailDict[error]
+#                print "Decide:",error,': ',errorCount
                 if errorCount > self.errorEmailRepeatLimit:
                     emailErrorList.append(error)
                     self.errorEmailDict[error] = 0
@@ -621,7 +638,9 @@ class AutoFillInterface():
                 name = self.detectorConfigDict[detector]["Name"]
                 detStr = '%s (%s) current temperature %sC\n'%(detector,name,temp)
                 tempString+=detStr
+        print "Sending Email!"
         errorBody += '\n'+tempString
+        self.EventLog.info('Sending Email:'+repr(errorBody))
         msg = MIMEText(errorBody+self.emailSignature)
         msg['Subject'] = 'Room 134 Liquid Nitrogen Fill System'
         msg['From'] = self.senderEmail
@@ -719,10 +738,11 @@ class AutoFillInterface():
             cnfgFile.set(section, option, value)
         with open(self.detectorConfigFile, 'w') as FILE:
             cnfgFile.write(FILE)
-        with self.valuesDictLock and self.configDictLock:
-            self.cleanValuesDict(sections)
-            self.loadDetectorConfig()
-            
+
+        self.cleanValuesDict(sections)
+#            print "Write Finished" 
+        self.loadDetectorConfig()
+           
         self.loadConfigEvent.set()
         
     def constructSettingsDict(self,sections,options,values):
@@ -874,7 +894,7 @@ class AutoFillInterface():
                                 strtime_h = dt.strftime(start_h,self.timeFormat)
                                 strtimeout_i = str(timeout_i).split(':')[1]
 #                                 strtimeout_h = str(timeout_h).split(':')[1]
-                                conStr = '%s(%s) fill at %s (timeout %s min) conflicts with %s(%s) fill at %s'%\
+                                conStr = '%s(%s) fill at %s (%s min timeout) conflicts with %s(%s) fill at %s'%\
                                         (detector_i,detector_i_name,strTime_i,strtimeout_i,
                                         detector_h,detector_h_name,strtime_h)
                                 conflictList.append(conStr)
@@ -928,15 +948,18 @@ class AutoFillInterface():
         Make a plot of the recorded temperatures for the give detector number
         :detName: - detector number string that the graph will be made,
         '''
-        detName = detName.replace(' ','') #take the space out of detector name to match file name
-        logFile = self.logDir+'%sLog.txt'%detName
+        fileName = detName.replace(' ','') #take the space out of detector name to match file name
+        logFile = self.logDir+'%sLog.txt'%fileName
         
-        with self.valuesDictLock: #get the values dict lock to prevent logDetectorTemp from grabbing the log file
+        with self.valuesDictLock and self.configDictLock: 
+            #get the values dict lock to prevent logDetectorTemp from grabbing the log file
             with open(logFile, 'r') as FILE:
                 detectorTemps = FILE.readlines() #read all the
+            detectorName = self.detectorConfigDict[detName]['Name']
         temps = []
         times = []
-        dataDate = detectorTemps[0].split('|')[0].split(' ')[0] #Log files only record for one day, get that date
+        dataDate = detectorTemps[-1].split('|')[0].split(' ')[0] #Log files only record for one day, get that date
+                            #get the date at the end of the file, ie the most current values
         for line in detectorTemps:
             line = line.strip('\r')
             sline = line.split('|')
@@ -951,7 +974,7 @@ class AutoFillInterface():
         subtitle = 'Temperature Vs Time'
         normalFig.suptitle(subtitle,fontsize=15)
         normalax = normalFig.add_subplot(111)
-        normalax.plot_date(times,temps,'-',linewidth=1.0,label='%s Temperature Log'%detName)
+        normalax.plot_date(times,temps,'-',linewidth=1.0,label='%s(%s) Temperature Log'%(detName,detectorName))
         normalax.set_xlabel('Date (%s)'%dataDate)
         normalax.set_ylabel('Detector Temperature (C)')
         normalax.autoscale_view()
