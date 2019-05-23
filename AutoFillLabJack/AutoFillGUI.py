@@ -149,7 +149,7 @@ class AutoFillGUI():
         if detector == 'Line Chill':
             try: 
                 option = self.chillShortHand[sptext[1]] #use the shorthand dict to get the correct option to set
-            except KeyError:
+            except KeyError or IndexError:
                 msg = '%s not a valid option for %s'%(sptext,detector)
                 self._printError(msg)
                 return False
