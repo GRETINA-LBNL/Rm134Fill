@@ -18,6 +18,7 @@ import logging
 import sys
 import matplotlib.pyplot as plt
 import matplotlib.dates as pltdates
+import numpy as np
 #import psutil
 
 # from __builtin__ import file
@@ -62,7 +63,7 @@ class AutoFillInterface():
         self.ventCloseThresholdTemp = -230 #Temp of vent at which fill valve will be closed.
         self.inihibitFills = False
         self.errorRepeatLimit = 30 #number of times the error needs to show before it is emaild
-        self.errorEmailRepeatLimit = 8 #number of error has crosses errorRepeatLimit before getting emailed again
+        self.errorEmailRepeatLimit = 12 #number of error has crosses errorRepeatLimit before getting emailed again
         self.emailRecipents = 'ADonoghue@lbl.gov'
         self.senderEmail    = 'gretinafilling@gmail.com'
         self.emailSignature = '\nCheers,\nRoom 134 Auto Fill Sytem'
@@ -72,7 +73,7 @@ class AutoFillInterface():
 #         self.infoGatherLock = threading.Lock()
         self.remoteCmdDict = {'get':self.readDetectorConfig,'temp':self.getDetectorTemps,
                                 'error':self.readDetectorErrors}
-        self.pollTime = 30
+        self.pollTime = 30 #in seconds
         
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
@@ -185,6 +186,40 @@ class AutoFillInterface():
         else:        
             valveList = ','.join(openValves)
         return "\tFill Valve(s) currently open: "+bcolors.OKGREEN+valveList+bcolors.ENDC
+    
+    def getNextFillScheduled(self):
+        '''
+        Get the next detector that will be filled
+
+        '''
+        self.configDictLock.acquire()
+        curTime = dt.today()
+#        curTimeStr = curTime.strftime(self.timeFormat)
+        detectorNames = []
+        detectorDiffFromNow = []
+        detectorFillTime = []
+        timeZero = td(hours=0,minutes=0,seconds=0)
+        for detector in self.enabledDetectors:
+            schedule = self.detectorConfigDict[detector]["Fill Schedule"]
+            splitSchedule = schedule.split(",")
+            for fillTime in splitSchedule:
+                timeDifference = dt.strptime(fillTime,self.timeFormat)-curTime
+                
+                if timeDifference>=timeZero:
+                    detectorNames.append(detector)
+                    detectorDiffFromNow.append(timeDifference)
+                    detectorFillTime.append(fillTime)        
+        
+        sortedIndex = np.argsort(detectorDiffFromNow)
+        if len(sortedIndex)!=0:
+            returnString = "Next detector to be fill is "+bcolors.OKGREEN+detectorNames[sortedIndex[0]]+\
+                           bcolors.ENDC+" at "+bcolors.OKGREEN+detectorFillTime[sortedIndex[0]]+\
+                            bcolors.ENDC
+        else:
+            returnString=''        
+        self.configDictLock.release()
+        return returnString
+
             
     def readVentTemps(self):
         '''
@@ -239,8 +274,9 @@ class AutoFillInterface():
         for detector in self.detectorConfigDict.keys():
             if 'Detector' in detector: #make sure it is a detector not the line chill
                 self.detectors.append(detector)
-                self.detectorValuesDict[detector] = {'Detector Temperature':'N/A','Vent Temperature':'N/A','Valve State':False,\
-                                                     'Fill Started Time':'N/A'}
+            
+                self.detectorValuesDict[detector] = {'Detector Temperature':'N/A','Vent Temperature':'N/A',\
+                                'Valve State':False,'Fill Started Time':'N/A',"Fill Expired":False}
                 if self.detectorConfigDict[detector]['Fill Enabled'] == 'True':
                     self.enabledDetectors.append(detector)
                 if self.detectorConfigDict[detector]['Temperature Logging'] == 'True':
@@ -384,13 +420,12 @@ class AutoFillInterface():
                 name = self.detectorConfigDict[detector]['Name']
                 msg = '%s (%s) temperature has exceeded its max allowed temperature'%(detector,name)
                 self.errorList.append(msg)
-                self.EventLog.info(msg)
         self.configDictLock.release()
         self.valuesDictLock.release()               
         
     def checkStartDetectorFills(self):
         '''
-        Check the schedule for each detector and start a fill if needed
+        Check the schedule for each detector and start a fill if needed     
         '''    
         detectorToOpen = []
         curTime = dt.today()
@@ -398,8 +433,10 @@ class AutoFillInterface():
         
         for detector in self.enabledDetectors:
             schedule = self.detectorConfigDict[detector]['Fill Schedule']
+            logMsg = "Checking %s, Time: %s, Schedule: %s"%(detector,curTimeStr,repr(schedule))
+            self.EventLog.debug(logMsg)
             if curTimeStr in schedule:
-                print "Detector to Fill: ", detector, "Schedule: ",schedule,"Current Time: ",curTimeStr    
+#                print "Detector to Fill: ", detector, "Schedule: ",schedule,"Current Time: ",curTimeStr    
                 if self.detectorValuesDict[detector]['Valve State'] == False: 
                         #check to make sure the valve has not already been opened
                     detectorToOpen.append(detector) #make the list of valves to open
@@ -556,17 +593,18 @@ class AutoFillInterface():
                 errorDict[error] = 1
         
         emailBody = ''
-        
+        emailErrorList = []
         for (error, numRepeat) in self.errorDict.iteritems():
 #            print "Construct ",error,": ",numRepeat
             if numRepeat >= self.errorRepeatLimit:
-                emailBody += ',%s'%error
+                emailErrorList.append(error)
                 errorDict[error] = 0 #reset the error counter 
                 self.errorList = filter(lambda x: x != error, self.errorList) 
                                 #remove the errors that have been reported
                                
             else:
                 continue
+        emailBody = ",".join(emailErrorList)
         self.errorDict = errorDict        
         return emailBody
     
@@ -624,15 +662,16 @@ class AutoFillInterface():
         for error in validErrors.split(','):
             try:
                 errorCount = self.errorEmailDict[error]
-#                print "Decide:",error,': ',errorCount
+                print "Decide:",error,': ',errorCount
                 if errorCount > self.errorEmailRepeatLimit:
                     emailErrorList.append(error)
                     self.errorEmailDict[error] = 0
-                self.errorEmailDict[error] = errorCount+1
+                else:
+                    self.errorEmailDict[error] = errorCount+1
             except KeyError: #send the error the first time it is reported
                 self.errorEmailDict[error] = 0
                 emailErrorList.append(error)
-        
+#        print "ErrorDict", self.errorEmailDict
         if emailErrorList != []:
             emailBody = ','.join(emailErrorList)        
             self.sendEmail(emailBody)

@@ -572,11 +572,12 @@ class AutoFillGUI():
         elif status == False:
             msg = "Main thread is not running."
         valveStatus = self.interface.getValveStatus()
-        #add report for next fill to start
+        nextFill = self.interface.getNextFillScheduled()
         if remote == True:
-            return msg+valveStatus
+            return msg+"\n"+valveStatus+"\n"+nextFill
         elif remote == False:
             print valveStatus
+            print nextFill
             self._printOKGreen(msg)            
 
     def mainInput(self):
