@@ -196,25 +196,32 @@ class AutoFillInterface():
         curTime = dt.today()
 #        curTimeStr = curTime.strftime(self.timeFormat)
         detectorNames = []
+        detectorGivenNames= []
         detectorDiffFromNow = []
         detectorFillTime = []
         timeZero = td(hours=0,minutes=0,seconds=0)
+        timeZeroToday = dt(hour=0,minute=0,second=0,year=curTime.year,\
+                                            month=curTime.month,day=curTime.day)
         for detector in self.enabledDetectors:
             schedule = self.detectorConfigDict[detector]["Fill Schedule"]
             splitSchedule = schedule.split(",")
             for fillTime in splitSchedule:
-                timeDifference = dt.strptime(fillTime,self.timeFormat)-curTime
-                
-                if timeDifference>=timeZero:
+                splitFill = fillTime.split(':')
+                fillTimeToday = timeZeroToday+td(minutes=int(splitFill[1]),hours=int(splitFill[0]))
+                timeDifference = fillTimeToday-curTime        
+                if timeDifference >= timeZero: #only include fills that will happen after the current time
                     detectorNames.append(detector)
+                    detectorGivenNames.append(self.detectorConfigDict[detector]["Name"])
                     detectorDiffFromNow.append(timeDifference)
-                    detectorFillTime.append(fillTime)        
+                    detectorFillTime.append(fillTime) 
+                      
         
         sortedIndex = np.argsort(detectorDiffFromNow)
         if len(sortedIndex)!=0:
-            returnString = "Next detector to be fill is "+bcolors.OKGREEN+detectorNames[sortedIndex[0]]+\
-                           bcolors.ENDC+" at "+bcolors.OKGREEN+detectorFillTime[sortedIndex[0]]+\
-                            bcolors.ENDC
+            returnString = "\tNext detector to be filled today is %s%s(%s)%s at %s%s%s"%(\
+                    bcolors.OKGREEN,detectorNames[sortedIndex[0]],detectorGivenNames[sortedIndex[0]],\
+                           bcolors.ENDC,bcolors.OKGREEN,detectorFillTime[sortedIndex[0]],\
+                            bcolors.ENDC)
         else:
             returnString=''        
         self.configDictLock.release()
@@ -276,7 +283,8 @@ class AutoFillInterface():
                 self.detectors.append(detector)
             
                 self.detectorValuesDict[detector] = {'Detector Temperature':'N/A','Vent Temperature':'N/A',\
-                                'Valve State':False,'Fill Started Time':'N/A',"Fill Expired":False}
+                                'Valve State':False,'Fill Started Time':'N/A',"Fill Expired":False,\
+                                'Fill Inhibited':False}
                 if self.detectorConfigDict[detector]['Fill Enabled'] == 'True':
                     self.enabledDetectors.append(detector)
                 if self.detectorConfigDict[detector]['Temperature Logging'] == 'True':
@@ -375,6 +383,7 @@ class AutoFillInterface():
             # check enabled detector's settings and start fills if needed
             self.checkFillInhibit()
             self.checkStartDetectorFills()
+            self.checkInhibitedFill() #check for previous fills that have been inhibited
 #             print 'Detector 1 valve state',self.detectorValuesDict['Detector 1']['Valve State']
             if self.inihibitFills == False: #if the inhibit fills is true no new 
                                             #fills will be started so don't do anyother checking
@@ -448,6 +457,7 @@ class AutoFillInterface():
                 detectorName = self.detectorConfigDict[detectorToOpen[0]]["Name"]
                 msg = 'Fill inhibit prevented %s (%s) from starting a fill'%\
                         (detectorToOpen[0],detectorName)
+                self.detectorValuesDict[detector]['Fill Inhibited'] = True                
                 self.errorList.append(msg)                
                 self.EventLog.info(msg)
         else: #if the fills are not inhibited start the filling process
@@ -519,8 +529,9 @@ class AutoFillInterface():
                 self.detectorValuesDict[detector]['Valve State'] = False
                 self.detectorValuesDict[detector]['Fill Expired'] = False
                 self.EventLog.info('Closing %s fill valve, LN2 temperature reached'%detector)
-            self.cleanValuesDict(valvesToClose) #clean up the values dict
-        self.valuesDictLock.release()    
+           
+        self.valuesDictLock.release()
+        self.cleanValuesDict(valvesToClose) #clean the values dict after releasing the lock  
      
     def checkFillTimeout(self):
         '''
@@ -573,6 +584,26 @@ class AutoFillInterface():
             except KeyError:
 #                print "KeyError", detector
                 continue
+        self.configDictLock.release()
+        self.valuesDictLock.release()
+    
+    def checkInhibitedFill(self):
+        '''
+        Check the values dict and see if a fill has been inhibited and report it to the error listen
+        
+        '''
+        self.valuesDictLock.acquire()
+        self.configDictLock.acquire()
+        for detector in self.enabledDetectors:
+            try:
+                if self.detectorValuesDict[detector]['Fill Inhibited'] == True:
+                    name = self.detectorConfigDict[detector]['Name']
+                    msg = 'Fill inhibit prevented %s (%s) from starting a fill'%(detector,name)
+                    self.errorList.append(msg)                
+            except KeyError:
+#                print "KeyError", detector
+                continue
+
         self.configDictLock.release()
         self.valuesDictLock.release()
 

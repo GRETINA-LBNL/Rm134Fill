@@ -573,11 +573,19 @@ class AutoFillGUI():
             msg = "Main thread is not running."
         valveStatus = self.interface.getValveStatus()
         nextFill = self.interface.getNextFillScheduled()
+
+        inhibited = self.interface.fillInhibitEvent.isSet()
+        if inhibited == True:
+            inhibitMsg = "\tFill Inhibit is "+bcolors.OKGREEN+"True"+bcolors.ENDC+'.'
+        elif inhibited == False:
+            inhibitMsg = "\tFill Inhibit is "+bcolors.OKGREEN+"False"+bcolors.ENDC+'.'
+
         if remote == True:
-            return msg+"\n"+valveStatus+"\n"+nextFill
+            return msg+"\n"+valveStatus+"\n"+nextFill+"\n"+inhibitMsg
         elif remote == False:
             print valveStatus
             print nextFill
+            print inhibitMsg
             self._printOKGreen(msg)            
 
     def mainInput(self):
