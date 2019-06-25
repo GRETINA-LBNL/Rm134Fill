@@ -171,6 +171,10 @@ class AutoFillGUI():
                 return value
         elif option == 'Name': #the values for names may have spaces in them so join them together
             values = sptext[2:] #get all the values
+            if values == []:
+                value = False
+                self._printError("Name can not be blank.")
+                return value
             value = ' '.join(values) #Make sure to get all the value the user wrote           
         else:
             try:
@@ -221,6 +225,11 @@ class AutoFillGUI():
         :sptext: - text input from commands that have True/False values
         :remote: - bool, not used, needed to be consistant with input functions
         '''
+        if len(sptext) != 3: #Make sure their are enough entries in the command 
+            errorMsg = "No valid command entered in command."
+            value = False
+            self._printError(errorMsg)
+            return value
         inputValue = sptext[2].capitalize()            
         if inputValue == 'False': #bool() conversion does not work for strings, do the test long hand 
             value = 'False'
