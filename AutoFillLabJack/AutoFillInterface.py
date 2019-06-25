@@ -19,6 +19,8 @@ import sys
 import matplotlib.pyplot as plt
 import matplotlib.dates as pltdates
 import numpy as np
+import psutil
+
 #import psutil
 
 # from __builtin__ import file
@@ -74,6 +76,9 @@ class AutoFillInterface():
         self.remoteCmdDict = {'get':self.readDetectorConfig,'temp':self.getDetectorTemps,
                                 'error':self.readDetectorErrors}
         self.pollTime = 30 #in seconds
+        self.hardDriveUsageLimit = 95.5 #limit for space used on the hard drive, ensuring there is 
+            #enough space for the program to work 
+
         
         #detector
 #         self.detectorValues = ['Detector Temp','Valve Temp','Valve State']
@@ -227,7 +232,7 @@ class AutoFillInterface():
         self.configDictLock.release()
         return returnString
 
-            
+    
     def readVentTemps(self):
         '''
         :detectors: list of detector names (strings) to read the valve temperature
@@ -384,6 +389,7 @@ class AutoFillInterface():
             self.checkFillInhibit()
             self.checkStartDetectorFills()
             self.checkInhibitedFill() #check for previous fills that have been inhibited
+            self.checkHardDriveCapacity() #see if the hard drive is full
 #             print 'Detector 1 valve state',self.detectorValuesDict['Detector 1']['Valve State']
             if self.inihibitFills == False: #if the inhibit fills is true no new 
                                             #fills will be started so don't do anyother checking
@@ -550,7 +556,7 @@ class AutoFillInterface():
 #                    self.errorList.append(msg) 
         numValves = len(valvesToClose)
         if numValves != 0:
-            print 'Closing valves, timeout',valvesToClose
+#            print 'Closing valves, timeout',valvesToClose
             states = [False]*numValves
             self.writeValveState(valvesToClose,states)
             for detector in valvesToClose:
@@ -599,6 +605,7 @@ class AutoFillInterface():
                 if self.detectorValuesDict[detector]['Fill Inhibited'] == True:
                     name = self.detectorConfigDict[detector]['Name']
                     msg = 'Fill inhibit prevented %s (%s) from starting a fill'%(detector,name)
+                    self.EventLog.info(msg)
                     self.errorList.append(msg)                
             except KeyError:
 #                print "KeyError", detector
@@ -606,6 +613,17 @@ class AutoFillInterface():
 
         self.configDictLock.release()
         self.valuesDictLock.release()
+
+    def checkHardDriveCapacity(self):
+        '''
+        Get the current free capacity of the hard drive and report an error if it is 
+        above the limits.
+        If the hard drive fills up then the auto fill may not funciton properly
+        '''         
+        percentFree = psutil.disk_usage('/').percent
+        if percentFree >= self.hardDriveUsageLimit:
+            msg = "Hard Drive has exceeded is usage limit. Program may not function properly."
+            self.errorList.append(msg)
 
     def constructDetectorErrors(self):
         '''
@@ -693,7 +711,7 @@ class AutoFillInterface():
         for error in validErrors.split(','):
             try:
                 errorCount = self.errorEmailDict[error]
-                print "Decide:",error,': ',errorCount
+#                print "Decide:",error,': ',errorCount
                 if errorCount > self.errorEmailRepeatLimit:
                     emailErrorList.append(error)
                     self.errorEmailDict[error] = 0
@@ -728,7 +746,7 @@ class AutoFillInterface():
                 name = self.detectorConfigDict[detector]["Name"]
                 detStr = '%s (%s) current temperature %sC\n'%(detector,name,temp)
                 tempString+=detStr
-        print "Sending Email!"
+#        print "Sending Email!"
         errorBody += '\n'+tempString
         self.EventLog.info('Sending Email:'+repr(errorBody))
         msg = MIMEText(errorBody+self.emailSignature)

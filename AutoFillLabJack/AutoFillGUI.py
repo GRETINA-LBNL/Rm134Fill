@@ -180,13 +180,19 @@ class AutoFillGUI():
                 self._printError(errorString)
                 return False
         self.interface.changeDetectorSetting(detector,option,value)
-        self.EventLog.info('Setting change entered: Detector %s, option %s, value %s'%(detector,option,value))
+        self.EventLog.info("Setting change entered: %s Option: %s, Value: %s"%(detector,option,value))
             
     def _fillScheduleInput(self,sptext):
         '''
         Handle values for the fill schedule input
         :sptext: - text from 'set detector schedule' command 
         '''    
+#        print "Command",sptext 
+        if len(sptext) != 3: #make sure their are enough entries in the commandInputs
+            errorString = "No valid time entered in command"
+            self._printError(errorString)
+            return False
+
         if ',' in sptext[2]:
             fillTimes = sptext[2].split(',')      
         else:
