@@ -417,6 +417,8 @@ class AutoFillInterface():
                     self.applyDetectorConfig()
                     self.loadConfigEvent.clear()
                 self.checkFillInhibit()
+                time.sleep(.5) #A LJM reconnect error is thrown at checkFillInhibit on a regular basis
+                                # perhaps the sleep will give the USB some rest
                 curTime = time.time()
 
          
