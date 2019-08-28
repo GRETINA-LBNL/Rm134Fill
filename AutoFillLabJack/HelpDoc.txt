@@ -16,7 +16,7 @@ Entering Dector Settings to Change
                                                                     only set when detector is enabled, not valid 
                                                                     for line chill
 					name 		- Detector Name			> name for the detector connected to the detector channel, 
-                                                            names can not contain spaces, not valid for line chill
+                                                            names can not contain spaces,  line chill does not have a name
                     logging     - Temperature Logging   > enable/disable the logging of the detector temperature
 		<value> - value option will be set to
 					Depends on the setting see below for special cases

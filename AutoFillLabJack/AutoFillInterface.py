@@ -43,6 +43,7 @@ class AutoFillInterface():
         self.detectorChangesDict = {}       
         self.detectorNamesDict = {} #Dict for connecting detector name and number, used in the GUI
         self.tempLoggingDict = {}
+        self.fillLoggingDict = {}
         self.EventLog = eventLog
 #         hostname = socket.gethostname()
         if hostname == 'MMStrohmeier-S67':
@@ -99,7 +100,7 @@ class AutoFillInterface():
         msgLst = self.loadDetectorConfig() 
         if msg != '':
             msgLst += '\n\t'+msg
-        self.getTemperatureLogs()
+        self.getTemperatureandFillLogs()
        
         return msgLst
     
@@ -147,7 +148,7 @@ class AutoFillInterface():
                     temp = self.detectorValuesDict[detector]['Detector Temperature']
                     self.tempLoggingDict[detector].info('%s C'%temp)
                     
-    def getTemperatureLogs(self):
+    def getTemperatureandFillLogs(self):
         '''
         get the temperature logs have have been started
         grap the event log as well
@@ -157,6 +158,10 @@ class AutoFillInterface():
         for detector in self.detectors:
             name = detector.replace(' ','') + 'Log'
             self.tempLoggingDict[detector] = logging.getLogger(name)
+            fillName = detector.replace(' ','')+'FillLog'
+            self.fillLoggingDict[detector] = logging.getLogger(fillName)
+    
+        
         
     def getDetectorTemps(self,detectors):
         '''
@@ -533,9 +538,15 @@ class AutoFillInterface():
             states = [False] * numValves
             print 'Closing valves, vent',valvesToClose
             self.writeValveState(valvesToClose,states)
+            valveCloseTime = dt.today().strftime(self.timeFormat)
             for detector in valvesToClose:
                 self.detectorValuesDict[detector]['Valve State'] = False
                 self.detectorValuesDict[detector]['Fill Expired'] = False
+                fillStartTime = self.detectorValuesDict[detector]['Fill Start']
+                fillTime = dt.strptime(valveCloseTime,self.timeFormat)-dt.strptime(fillStartTime,self.timeFormat)
+                fillTimeStr = str(fillTime) #format is HH:MM:SS
+                self.fillLoggingDict[detector].info("%s Filled in %s"%(detector,fillTimeStr))
+                print "%s Filled in %s minutes"%(detector,fillTimeStr)
                 self.EventLog.info('Closing %s fill valve, LN2 temperature reached'%detector)
            
         self.valuesDictLock.release()
@@ -963,7 +974,7 @@ class AutoFillInterface():
                         Tout = str(timeout).split(':')[1]
                         msg = '%s(%s) has Schedule Overlap: %s and %s with timeout: %s min'%\
                                     (detector,detName,Sch1,Sch2,Tout)
-                        overlapString.append(msg)
+                        overlapList.append(msg)
                         
                     else:
                         continue
