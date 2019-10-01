@@ -62,6 +62,10 @@ class AutoFillGUI():
             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
             self.HelpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\HelpDoc.txt'
             self.MiniHelpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\MiniHelpDoc.txt'
+        elif self.hostname == "GretaFillingLaptop":
+            self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
+            self.HelpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\HelpDoc.txt'
+            self.MiniHelpFile = 'C:\Python\Rm134Fill\AutoFillLabJack\MiniHelpDoc.txt'
         elif self.hostname == 'localhost':
             self.loggingConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/logging.cfg'
             self.HelpFile = '/home/gretina/Rm134Fill/AutoFillLabJack/HelpDoc.txt'
@@ -563,7 +567,9 @@ class AutoFillGUI():
             self._printError(msg)
             return False
         else:
-            self.interface.graphDetectorTemp(detectorNumbers)
+            errorStr = self.interface.graphDetectorTemp(detectorNumbers)
+            if errorStr != None:
+                print errorStr
 
     def loadInput(self,text,remote):
         '''

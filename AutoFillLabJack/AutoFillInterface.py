@@ -51,6 +51,10 @@ class AutoFillInterface():
             self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
             self.logDir = "C:\Python\Rm134Fill\AutoFillLabJack\Logs\\"#the last \ can not be alone
 #             self.loggingConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\winLogging.cfg'
+        elif hostname == "GretaFillingLaptop":
+            self.detectorConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\DetectorConfiguration.cfg'
+            self.detectorWiringConfigFile = 'C:\Python\Rm134Fill\AutoFillLabJack\PortWiring.cfg'
+            self.logDir = "C:\Python\Rm134Fill\Logs\\"
         elif hostname == 'localhost':
             self.detectorConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/DetectorConfiguration.cfg'
             self.detectorWiringConfigFile = '/home/gretina/Rm134Fill/AutoFillLabJack/PortWiring.cfg'
@@ -1070,7 +1074,7 @@ class AutoFillInterface():
         :detName: - detector number string that the graph will be made,
         '''
         fileName = detName.replace(' ','') #take the space out of detector name to match file name
-        logFile = self.logDir+'%sLog.txt'%fileName
+        logFile = self.logDir+'%sTempLog.txt'%fileName
         
         with self.valuesDictLock and self.configDictLock: 
             #get the values dict lock to prevent logDetectorTemp from grabbing the log file
@@ -1079,8 +1083,12 @@ class AutoFillInterface():
             detectorName = self.detectorConfigDict[detName]['Name']
         temps = []
         times = []
-        dataDate = detectorTemps[-1].split('|')[0].split(' ')[0] #Log files only record for one day, get that date
-                            #get the date at the end of the file, ie the most current values
+        try:
+            dataDate = detectorTemps[-1].split('|')[0].split(' ')[0] #Log files only record for one day, get that date
+                        #get the date at the end of the file, ie the most current values
+        except IndexError:
+            errorMsg = "\t"+bcolors.WARNING+"No log files to plot"+bcolors.ENDC
+            return errorMsg
         for line in detectorTemps:
             line = line.strip('\r')
             sline = line.split('|')
